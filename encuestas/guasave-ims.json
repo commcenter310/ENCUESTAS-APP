@@ -1,0 +1,568 @@
+{
+  "formato": 1,
+  "organizacion": "Instituto de Mercadotecnia de Sinaloa (IMS)",
+  "versiones": ["A", "B", "C"],
+  "listas": {
+    "partidos": [
+      { "valor": "pri", "etiqueta": "PRI" },
+      { "valor": "pan", "etiqueta": "PAN" },
+      { "valor": "pt", "etiqueta": "PT" },
+      { "valor": "pvem", "etiqueta": "PVEM" },
+      { "valor": "mc", "etiqueta": "MC" },
+      { "valor": "pas", "etiqueta": "PAS" },
+      { "valor": "morena", "etiqueta": "MORENA" }
+    ],
+    "personas": [
+      { "valor": "cecilia_ramirez", "etiqueta": "Cecilia Ramírez Montoya" },
+      { "valor": "martin_ahumada", "etiqueta": "Martín Ahumada Quintero" },
+      { "valor": "feliciano_valle", "etiqueta": "Feliciano “Chano” Valle Sandoval" },
+      { "valor": "casimiro_zamora", "etiqueta": "Casimiro Zamora" },
+      { "valor": "martha_dagnino", "etiqueta": "Martha Dagnino" },
+      { "valor": "felicita_pompa", "etiqueta": "Felicita Pompa Robles" },
+      { "valor": "zulma_gamez", "etiqueta": "Zulma Karina Gámez Cervantes" },
+      { "valor": "enrique_covarrubias", "etiqueta": "Enrique Covarrubias" },
+      { "valor": "gerardo_penuelas", "etiqueta": "Gerardo Peñuelas" },
+      { "valor": "salvador_rodriguez", "etiqueta": "Salvador Rodríguez Peñuelas" },
+      { "valor": "cecilia_rojo", "etiqueta": "Cecilia Rojo" },
+      { "valor": "xochitl_soto", "etiqueta": "Xóchitl Soto" },
+      { "valor": "dolores_franco", "etiqueta": "Dolores Franco" }
+    ],
+    "aspirantes_morena": [
+      { "valor": "cecilia_ramirez", "etiqueta": "Cecilia Ramírez Montoya" },
+      { "valor": "martin_ahumada", "etiqueta": "Martín Ahumada Quintero" },
+      { "valor": "feliciano_valle", "etiqueta": "Feliciano “Chano” Valle Sandoval" },
+      { "valor": "casimiro_zamora", "etiqueta": "Casimiro Zamora" },
+      { "valor": "martha_dagnino", "etiqueta": "Martha Dagnino" },
+      { "valor": "felicita_pompa", "etiqueta": "Felicita Pompa Robles" },
+      { "valor": "zulma_gamez", "etiqueta": "Zulma Karina Gámez Cervantes" },
+      { "valor": "aurelia_leal", "etiqueta": "Aurelia Leal" },
+      { "valor": "enrique_covarrubias", "etiqueta": "Enrique Covarrubias" },
+      { "valor": "gerardo_penuelas", "etiqueta": "Gerardo Peñuelas" },
+      { "valor": "ninguno", "etiqueta": "Ninguno", "fija": true },
+      { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+    ]
+  },
+  "arranque": [
+    {
+      "id": "seccion",
+      "tipo": "numero",
+      "texto": "Sección electoral",
+      "instruccion": "Sección asignada donde se levanta esta entrevista.",
+      "min": 1,
+      "max": 9999
+    }
+  ],
+  "introduccion": {
+    "texto": "Buenos días / tardes.\n\nMi nombre es {encuestador} y represento al Instituto de Mercadotecnia de Sinaloa (IMS). Estamos realizando un estudio sobre temas económicos, sociales y políticos en el municipio de Guasave. Su vivienda ha sido seleccionada al azar para participar. Sus respuestas serán tratadas de manera confidencial y anónima, y solo se usarán con fines estadísticos. La entrevista dura aproximadamente 10 minutos. Agradecemos su tiempo y sinceridad al responder.",
+    "instruccion": "No mencione a ningún partido, aspirante ni patrocinador del estudio. Lea las preguntas textualmente y en el orden indicado. No sugiera respuestas. Las opciones marcadas “NO LEER” no se leen al entrevistado."
+  },
+  "secciones": [
+    {
+      "id": "filtros",
+      "titulo": "Filtros de elegibilidad",
+      "preguntas": [
+        {
+          "id": "F1",
+          "numero": "F1",
+          "tipo": "unica",
+          "texto": "¿Vive usted de manera permanente en el municipio de Guasave?",
+          "opciones": [
+            { "valor": "si", "etiqueta": "Sí" },
+            { "valor": "no", "etiqueta": "No" }
+          ],
+          "terminar": [
+            { "si": { "pregunta": "F1", "es": "no" }, "motivo": "No vive de manera permanente en Guasave" }
+          ]
+        },
+        {
+          "id": "F2",
+          "numero": "F2",
+          "tipo": "unica",
+          "texto": "¿Cuenta usted con credencial para votar vigente con domicilio en Guasave?",
+          "opciones": [
+            { "valor": "si", "etiqueta": "Sí" },
+            { "valor": "no", "etiqueta": "No" }
+          ],
+          "terminar": [
+            { "si": { "pregunta": "F2", "es": "no" }, "motivo": "Sin credencial para votar vigente con domicilio en Guasave" }
+          ]
+        },
+        {
+          "id": "F3",
+          "numero": "F3",
+          "tipo": "numero",
+          "texto": "¿Qué edad tiene usted?",
+          "instruccion": "Menor de 18: terminar entrevista. Verificar la cuota de sexo y grupo de edad asignada a la sección antes de continuar.",
+          "min": 1,
+          "max": 120,
+          "sufijo": "años",
+          "terminar": [
+            { "si": { "pregunta": "F3", "menorQue": 18 }, "motivo": "Menor de 18 años" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "temas",
+      "titulo": "I. Temas de interés y prioridades ciudadanas",
+      "preguntas": [
+        {
+          "id": "P1",
+          "numero": "1",
+          "tipo": "unica",
+          "texto": "¿Cuál considera usted que es el principal problema que afecta actualmente al municipio de Guasave?",
+          "instruccion": "Pregunta espontánea: NO leer opciones; codificar la respuesta.",
+          "opciones": [
+            { "valor": "inseguridad", "etiqueta": "Inseguridad" },
+            { "valor": "desempleo_economia", "etiqueta": "Desempleo / economía" },
+            { "valor": "campo_cosechas", "etiqueta": "Situación del campo y precios de cosechas" },
+            { "valor": "agua_potable", "etiqueta": "Agua potable" },
+            { "valor": "calles", "etiqueta": "Calles en mal estado" },
+            { "valor": "drenaje", "etiqueta": "Drenaje" },
+            { "valor": "alumbrado", "etiqueta": "Alumbrado público" },
+            { "valor": "salud", "etiqueta": "Servicios de salud" },
+            { "valor": "otro", "etiqueta": "Otro", "fija": true, "especificar": true },
+            { "valor": "no_sabe", "etiqueta": "NO SABE", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P2",
+          "numero": "2",
+          "tipo": "abierta",
+          "texto": "¿Y cuál diría que es el principal problema de su colonia o comunidad?",
+          "instruccion": "Pregunta abierta. Anotar textualmente.",
+          "multilinea": true,
+          "maxCaracteres": 300
+        },
+        {
+          "id": "P3",
+          "numero": "3",
+          "tipo": "unica",
+          "texto": "¿Y cuál cree usted que es el principal problema que enfrenta actualmente el país?",
+          "opciones": [
+            { "valor": "inseguridad", "etiqueta": "Inseguridad" },
+            { "valor": "economia", "etiqueta": "Economía" },
+            { "valor": "corrupcion", "etiqueta": "Corrupción" },
+            { "valor": "educacion", "etiqueta": "Educación" },
+            { "valor": "salud", "etiqueta": "Salud" },
+            { "valor": "no_sabe", "etiqueta": "NO SABE", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gobiernos",
+      "titulo": "II. Opinión sobre los gobiernos actuales",
+      "preguntas": [
+        {
+          "id": "P4",
+          "numero": "4",
+          "tipo": "unica",
+          "texto": "En general, ¿cómo calificaría la situación actual del municipio de Guasave?",
+          "opciones": [
+            { "valor": "muy_buena", "etiqueta": "Muy buena" },
+            { "valor": "buena", "etiqueta": "Buena" },
+            { "valor": "regular", "etiqueta": "Regular" },
+            { "valor": "mala", "etiqueta": "Mala" },
+            { "valor": "muy_mala", "etiqueta": "Muy mala" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P5",
+          "numero": "5",
+          "tipo": "unica",
+          "texto": "En comparación con el año pasado, ¿considera que la situación de Guasave ha…?",
+          "opciones": [
+            { "valor": "mejorado", "etiqueta": "Mejorado" },
+            { "valor": "empeorado", "etiqueta": "Empeorado" },
+            { "valor": "igual", "etiqueta": "Permanecido igual" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P6",
+          "numero": "6",
+          "tipo": "matriz",
+          "texto": "En términos generales, ¿aprueba o desaprueba la gestión de las siguientes autoridades?",
+          "filas": [
+            { "valor": "sheinbaum", "etiqueta": "Presidenta Claudia Sheinbaum Pardo" },
+            { "valor": "dominguez", "etiqueta": "Gobernadora interina Graciela Domínguez Nava" },
+            { "valor": "ramirez", "etiqueta": "Presidenta Municipal de Guasave Cecilia Ramírez Montoya" }
+          ],
+          "columnas": [
+            { "valor": "aprueba", "etiqueta": "Aprueba", "tono": "positivo" },
+            { "valor": "desaprueba", "etiqueta": "Desaprueba", "tono": "negativo" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P7",
+          "numero": "7",
+          "tipo": "escala",
+          "texto": "¿Cómo calificaría la gestión de la Presidenta Claudia Sheinbaum Pardo?",
+          "instruccion": "Escala: 1 es “muy mala” y 10 es “muy buena”.",
+          "min": 1,
+          "max": 10,
+          "etiquetaMin": "Muy mala",
+          "etiquetaMax": "Muy buena",
+          "nsnc": true
+        },
+        {
+          "id": "P8",
+          "numero": "8",
+          "tipo": "escala",
+          "texto": "¿Cómo calificaría la gestión de la Gobernadora interina Graciela Domínguez Nava?",
+          "instruccion": "Escala: 1 es “muy mala” y 10 es “muy buena”.",
+          "min": 1,
+          "max": 10,
+          "etiquetaMin": "Muy mala",
+          "etiquetaMax": "Muy buena",
+          "nsnc": true
+        },
+        {
+          "id": "P9",
+          "numero": "9",
+          "tipo": "escala",
+          "texto": "¿Cómo calificaría la gestión de la Presidenta Municipal de Guasave, Cecilia Ramírez Montoya?",
+          "instruccion": "Escala: 1 es “muy mala” y 10 es “muy buena”.",
+          "min": 1,
+          "max": 10,
+          "etiquetaMin": "Muy mala",
+          "etiquetaMax": "Muy buena",
+          "nsnc": true
+        }
+      ]
+    },
+    {
+      "id": "clima",
+      "titulo": "III. Clima electoral",
+      "preguntas": [
+        {
+          "id": "P10",
+          "numero": "10",
+          "tipo": "unica",
+          "texto": "En 2027 habrá elecciones para elegir a la Presidenta o Presidente Municipal de Guasave. ¿Qué tan probable es que usted vaya a votar?",
+          "opciones": [
+            { "valor": "seguro_votara", "etiqueta": "Seguro votará" },
+            { "valor": "probablemente_votara", "etiqueta": "Probablemente votará" },
+            { "valor": "probablemente_no", "etiqueta": "Probablemente no votará" },
+            { "valor": "seguro_no", "etiqueta": "Seguro no votará" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P11",
+          "numero": "11",
+          "tipo": "unica",
+          "texto": "Independientemente de por quién vaya a votar, ¿con cuál partido político se identifica usted más?",
+          "instruccion": "El orden de los partidos ya está rotado según la versión del cuestionario.",
+          "rotar": true,
+          "opciones": [
+            { "valor": "pri", "etiqueta": "PRI" },
+            { "valor": "pan", "etiqueta": "PAN" },
+            { "valor": "pt", "etiqueta": "PT" },
+            { "valor": "pvem", "etiqueta": "PVEM" },
+            { "valor": "mc", "etiqueta": "MC" },
+            { "valor": "pas", "etiqueta": "PAS" },
+            { "valor": "morena", "etiqueta": "MORENA" },
+            { "valor": "otro", "etiqueta": "Otro", "fija": true, "especificar": true },
+            { "valor": "ninguno", "etiqueta": "Ninguno", "fija": true },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P12",
+          "numero": "12",
+          "tipo": "unica",
+          "texto": "Si hoy fueran las elecciones para elegir a la Presidenta o Presidente Municipal de Guasave, ¿por cuál partido votaría?",
+          "instruccion": "El orden de los partidos ya está rotado según la versión del cuestionario.",
+          "rotar": true,
+          "opciones": [
+            { "valor": "pri", "etiqueta": "PRI" },
+            { "valor": "pan", "etiqueta": "PAN" },
+            { "valor": "pt", "etiqueta": "PT" },
+            { "valor": "pvem", "etiqueta": "PVEM" },
+            { "valor": "mc", "etiqueta": "MC" },
+            { "valor": "pas", "etiqueta": "PAS" },
+            { "valor": "morena", "etiqueta": "MORENA" },
+            { "valor": "ninguno", "etiqueta": "Ninguno", "fija": true },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P13",
+          "numero": "13",
+          "tipo": "unica",
+          "texto": "¿Por cuál partido nunca votaría?",
+          "rotar": true,
+          "opciones": [
+            { "valor": "pri", "etiqueta": "PRI" },
+            { "valor": "pan", "etiqueta": "PAN" },
+            { "valor": "pt", "etiqueta": "PT" },
+            { "valor": "pvem", "etiqueta": "PVEM" },
+            { "valor": "mc", "etiqueta": "MC" },
+            { "valor": "pas", "etiqueta": "PAS" },
+            { "valor": "morena", "etiqueta": "MORENA" },
+            { "valor": "cualquiera", "etiqueta": "Votaría por cualquiera", "fija": true },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P14",
+          "numero": "14",
+          "tipo": "unica",
+          "texto": "Pensando en el próximo proceso electoral, ¿prefiere que la próxima persona al frente del Ayuntamiento de Guasave sea…?",
+          "opciones": [
+            { "valor": "hombre", "etiqueta": "Hombre" },
+            { "valor": "mujer", "etiqueta": "Mujer" },
+            { "valor": "indiferente", "etiqueta": "Le es indiferente" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P15",
+          "numero": "15",
+          "tipo": "unica",
+          "texto": "¿Qué característica valoraría más en la próxima Presidenta o Presidente Municipal de Guasave?",
+          "opciones": [
+            { "valor": "experiencia", "etiqueta": "Experiencia en el gobierno" },
+            { "valor": "honestidad", "etiqueta": "Honestidad" },
+            { "valor": "propuestas", "etiqueta": "Propuestas" },
+            { "valor": "conozca_municipio", "etiqueta": "Que conozca el municipio" },
+            { "valor": "liderazgo", "etiqueta": "Liderazgo" },
+            { "valor": "cercania", "etiqueta": "Cercanía con la gente" },
+            { "valor": "trabajo_equipo", "etiqueta": "Capacidad para trabajar en equipo" },
+            { "valor": "otro", "etiqueta": "Otro", "fija": true, "especificar": true },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P16",
+          "numero": "16",
+          "tipo": "abierta",
+          "texto": "Si hoy fueran las elecciones para Presidenta o Presidente Municipal de Guasave, ¿por quién votaría?",
+          "instruccion": "Pregunta abierta, sin mostrar nombres. Anotar textualmente.",
+          "maxCaracteres": 200
+        }
+      ]
+    },
+    {
+      "id": "personalidades",
+      "titulo": "IV. Conocimiento y opinión de personalidades",
+      "instruccion": "El orden de los nombres en este bloque ya está rotado según la versión del cuestionario (A, B o C). Léalos en el orden en que aparecen.",
+      "preguntas": [
+        {
+          "id": "P17",
+          "numero": "17",
+          "tipo": "conocimiento",
+          "texto": "¿Conoce o ha oído hablar de las siguientes personas?",
+          "instruccion": "Si responde “Sí”, pregunte la opinión.",
+          "filas": { "lista": "personas" },
+          "rotarFilas": true,
+          "textoOpinion": "¿Qué opinión tiene de esa persona: positiva, neutra o negativa?",
+          "opinion": [
+            { "valor": "positiva", "etiqueta": "Positiva", "tono": "positivo" },
+            { "valor": "neutra", "etiqueta": "Neutra", "tono": "neutro" },
+            { "valor": "negativa", "etiqueta": "Negativa", "tono": "negativo" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P18",
+          "numero": "18",
+          "tipo": "unica",
+          "texto": "De las siguientes personas, ¿quién le gustaría que fuera la candidata o candidato de Morena y sus aliados a la Presidencia Municipal de Guasave?",
+          "instruccion": "Mostrar la tarjeta con los nombres en el orden de la versión asignada.",
+          "opciones": { "lista": "aspirantes_morena" },
+          "rotar": true,
+          "tarjeta": true
+        },
+        {
+          "id": "P19",
+          "numero": "19",
+          "tipo": "unica",
+          "texto": "¿Y en segundo lugar?",
+          "instruccion": "Mostrar la tarjeta con los nombres en el orden de la versión asignada.",
+          "opciones": { "lista": "aspirantes_morena" },
+          "rotar": true,
+          "tarjeta": true,
+          "excluirRespuestaDe": "P18"
+        },
+        {
+          "id": "P20",
+          "numero": "20",
+          "tipo": "matriz",
+          "texto": "Si cada una de las siguientes personas fuera candidata o candidato a la Presidencia Municipal de Guasave, ¿cuál sería la intención de su voto?",
+          "filas": { "lista": "personas" },
+          "rotarFilas": true,
+          "columnas": [
+            { "valor": "seguro", "etiqueta": "Seguro votaría", "tono": "positivo" },
+            { "valor": "podria", "etiqueta": "Podría votar", "tono": "positivo_suave" },
+            { "valor": "nunca", "etiqueta": "Nunca votaría", "tono": "negativo" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "P21",
+          "numero": "21",
+          "tipo": "atributos",
+          "texto": "¿Cómo considera a las siguientes personas…?",
+          "instruccion": "Marcar un solo nombre por característica; solo aparecen las personas que el entrevistado conoce.",
+          "atributos": [
+            { "valor": "honesto", "etiqueta": "Más honesto(a)" },
+            { "valor": "experiencia", "etiqueta": "Más experiencia para gobernar" },
+            { "valor": "conoce_problemas", "etiqueta": "Conoce mejor los problemas de Guasave" },
+            { "valor": "cercano", "etiqueta": "Más cercano(a) a la gente" },
+            { "valor": "seguridad", "etiqueta": "Mejores resultados en seguridad" },
+            { "valor": "campo", "etiqueta": "Ayudaría más al campo" }
+          ],
+          "personas": { "lista": "personas" },
+          "rotarPersonas": true,
+          "soloConocidasEn": "P17",
+          "opcionesFijas": [
+            { "valor": "ninguna", "etiqueta": "Ninguna de las anteriores", "fija": true }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sociodemograficos",
+      "titulo": "V. Datos sociodemográficos",
+      "preguntas": [
+        {
+          "id": "S1",
+          "numero": "S1",
+          "tipo": "unica",
+          "texto": "Edad",
+          "opciones": [
+            { "valor": "18_24", "etiqueta": "18–24" },
+            { "valor": "25_34", "etiqueta": "25–34" },
+            { "valor": "35_44", "etiqueta": "35–44" },
+            { "valor": "45_54", "etiqueta": "45–54" },
+            { "valor": "55_64", "etiqueta": "55–64" },
+            { "valor": "65_mas", "etiqueta": "65 o más" }
+          ],
+          "derivarDe": {
+            "pregunta": "F3",
+            "rangos": [
+              { "hasta": 24, "valor": "18_24" },
+              { "hasta": 34, "valor": "25_34" },
+              { "hasta": 44, "valor": "35_44" },
+              { "hasta": 54, "valor": "45_54" },
+              { "hasta": 64, "valor": "55_64" },
+              { "hasta": 200, "valor": "65_mas" }
+            ]
+          }
+        },
+        {
+          "id": "S2",
+          "numero": "S2",
+          "tipo": "unica",
+          "texto": "Sexo",
+          "instruccion": "Anotar por observación.",
+          "opciones": [
+            { "valor": "hombre", "etiqueta": "Hombre" },
+            { "valor": "mujer", "etiqueta": "Mujer" }
+          ]
+        },
+        {
+          "id": "S3",
+          "numero": "S3",
+          "tipo": "unica",
+          "texto": "Nivel educativo",
+          "opciones": [
+            { "valor": "sin_estudios", "etiqueta": "Sin estudios" },
+            { "valor": "primaria", "etiqueta": "Primaria" },
+            { "valor": "secundaria", "etiqueta": "Secundaria" },
+            { "valor": "preparatoria", "etiqueta": "Preparatoria / Técnico" },
+            { "valor": "universitario", "etiqueta": "Universitario" },
+            { "valor": "posgrado", "etiqueta": "Posgrado" }
+          ]
+        },
+        {
+          "id": "S4",
+          "numero": "S4",
+          "tipo": "unica",
+          "texto": "Ocupación",
+          "opciones": [
+            { "valor": "estudiante", "etiqueta": "Estudiante" },
+            { "valor": "empleado", "etiqueta": "Empleado" },
+            { "valor": "independiente", "etiqueta": "Independiente" },
+            { "valor": "desempleado", "etiqueta": "Desempleado" },
+            { "valor": "ama_de_casa", "etiqueta": "Ama de casa" },
+            { "valor": "pensionado", "etiqueta": "Pensionado" },
+            { "valor": "empresario", "etiqueta": "Empresario / Patrón" },
+            { "valor": "jornalero", "etiqueta": "Trabajador del campo / Jornalero" },
+            { "valor": "productor_agricola", "etiqueta": "Productor agrícola" },
+            { "valor": "pescador", "etiqueta": "Pescador" },
+            { "valor": "otro", "etiqueta": "Otro", "fija": true, "especificar": true }
+          ]
+        },
+        {
+          "id": "S5",
+          "numero": "S5",
+          "tipo": "unica",
+          "texto": "Ingreso mensual del hogar",
+          "opciones": [
+            { "valor": "menos_5000", "etiqueta": "Menos de $5,000" },
+            { "valor": "5000_10000", "etiqueta": "$5,000–$10,000" },
+            { "valor": "10001_20000", "etiqueta": "$10,001–$20,000" },
+            { "valor": "mas_20000", "etiqueta": "Más de $20,000" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "S6",
+          "numero": "S6",
+          "tipo": "unica",
+          "texto": "¿Algún integrante de su hogar recibe un programa social del gobierno?",
+          "opciones": [
+            { "valor": "si", "etiqueta": "Sí" },
+            { "valor": "no", "etiqueta": "No" },
+            { "valor": "nsnc", "etiqueta": "NS/NC", "fija": true, "noLeer": true, "nsnc": true }
+          ]
+        },
+        {
+          "id": "DOM",
+          "tipo": "grupo",
+          "texto": "Domicilio del encuestado",
+          "campos": [
+            {
+              "id": "DOM_tipo",
+              "tipo": "unica",
+              "texto": "Tipo de localidad",
+              "opciones": [
+                { "valor": "ciudad", "etiqueta": "Ciudad de Guasave" },
+                { "valor": "rural", "etiqueta": "Sindicatura / comunidad rural" }
+              ]
+            },
+            {
+              "id": "DOM_localidad",
+              "tipo": "abierta",
+              "texto": "Sindicatura / Localidad",
+              "maxCaracteres": 120,
+              "mostrarSi": { "pregunta": "DOM_tipo", "es": "rural" }
+            },
+            { "id": "DOM_calle", "tipo": "abierta", "texto": "Calle", "maxCaracteres": 120 },
+            { "id": "DOM_numero", "tipo": "abierta", "texto": "No.", "maxCaracteres": 20, "opcional": true },
+            { "id": "DOM_colonia", "tipo": "abierta", "texto": "Colonia", "maxCaracteres": 120, "opcional": true },
+            { "id": "DOM_dl", "tipo": "numero", "texto": "Distrito Local", "min": 1, "max": 99, "opcional": true },
+            { "id": "DOM_df", "tipo": "numero", "texto": "Distrito Federal", "min": 1, "max": 99, "opcional": true }
+          ]
+        }
+      ]
+    }
+  ],
+  "cierre": {
+    "texto": "Agradezca la participación del encuestado.",
+    "declaracion": "Declaro que seguí todas las indicaciones metodológicas para la selección de la sección, la vivienda y la persona encuestada, que leí las preguntas textualmente y en el orden indicado, y que la información recabada es verídica. Autorizo al Instituto de Mercadotecnia de Sinaloa (IMS) a tomar las medidas correspondientes en caso de falsedad de datos."
+  },
+  "monitoreo": {
+    "campoZona": "seccion",
+    "etiquetaZona": "Sección",
+    "metaPorZona": 10,
+    "duracionMinimaSeg": 300,
+    "perfil": ["S2", "S1", "DOM_tipo"]
+  }
+}

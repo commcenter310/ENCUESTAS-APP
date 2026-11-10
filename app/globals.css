@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Colores de la app. La interfaz es solo clara: se usa en campo, a pleno sol.
+ * Los tonos de "marca" son la rampa azul de las gráficas, para que todo se
+ * vea de una sola pieza. El color es neutral a propósito: nada en pantalla
+ * debe sugerir un partido al entrevistado.
+ */
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-plano: #f9f9f7;
+  --color-superficie: #fcfcfb;
+  --color-tinta: #0b0b0b;
+  --color-tinta-2: #52514e;
+  --color-tinta-3: #898781;
+  --color-linea: #e1e0d9;
+  --color-eje: #c3c2b7;
+
+  --color-marca-50: #eef5fe;
+  --color-marca-100: #cde2fb;
+  --color-marca-200: #9ec5f4;
+  --color-marca-300: #6da7ec;
+  --color-marca-400: #3987e5;
+  --color-marca-500: #2a78d6;
+  --color-marca-600: #256abf;
+  --color-marca-700: #1c5cab;
+  --color-marca-800: #184f95;
+  --color-marca-900: #0d366b;
+
+  /* Gráficas */
+  --color-serie: #2a78d6;
+  --color-serie-suave: #86b6ef;
+  --color-contra: #e34948;
+  --color-neutro: #b5b4ab;
+  --color-apagado: #e1e0d9;
+
+  /* Estados (siempre con icono o texto, nunca solo color) */
+  --color-bien: #0ca30c;
+  --color-bien-texto: #006300;
+  --color-aviso: #fab219;
+  --color-aviso-texto: #7a4f00;
+  --color-grave: #d03b3b;
+  --color-grave-texto: #a32222;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-plano);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* En iOS un campo con letra menor a 16px hace zoom al enfocarlo. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-marca-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-imprimir {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}
