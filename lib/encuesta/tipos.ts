@@ -212,14 +212,39 @@ export type DefinicionEncuesta = {
     duracionMinimaSeg?: number;
     /** Claves que describen la muestra (sexo, edad...) en el tablero. */
     perfil?: string[];
+    /**
+     * Preguntas que se llenan solas con los datos de la sección en la muestra
+     * (si están vacías). Ej. { "distrito_local": "DOM_dl" }.
+     */
+    autollenar?: { distrito_local?: string; distrito_federal?: string };
   };
 };
+
+export type TipoEncuesta = 'rigor_cientifico' | 'posicionamiento';
+
+export const TIPOS_ENCUESTA: { valor: TipoEncuesta; nombre: string; ayuda: string }[] = [
+  {
+    valor: 'rigor_cientifico',
+    nombre: 'Rigor científico',
+    ayuda: 'Muestra probabilística por secciones, con margen de error y ponderación.',
+  },
+  {
+    valor: 'posicionamiento',
+    nombre: 'Posicionamiento',
+    ayuda: 'Medición de imagen, conocimiento y posicionamiento de actores.',
+  },
+];
+
+export function nombreDeTipo(tipo: TipoEncuesta | null | undefined): string {
+  return TIPOS_ENCUESTA.find((t) => t.valor === tipo)?.nombre ?? 'Sin tipo';
+}
 
 /** Fila de la tabla `encuestas`. */
 export type Encuesta = {
   id: string;
   clave: string;
   titulo: string;
+  tipo: TipoEncuesta;
   descripcion: string | null;
   definicion: DefinicionEncuesta;
   estado: 'borrador' | 'activa' | 'cerrada';

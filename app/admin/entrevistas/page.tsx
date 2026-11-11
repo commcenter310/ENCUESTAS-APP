@@ -10,6 +10,7 @@ import { columnasDeRespuestas, etiquetaDe } from '@/lib/encuesta/motor';
 import type { Encuesta, Entrevista, EstadoRevision } from '@/lib/encuesta/tipos';
 import { type EntrevistaConNombre, descargar, entrevistasACsv } from '@/lib/exportar';
 import { diaLocal, duracion, entero, fechaHora, hora } from '@/lib/formato';
+import { leerMuestra } from '@/lib/campo';
 import { supabase } from '@/lib/supabase';
 
 const POR_PAGINA = 50;
@@ -286,7 +287,11 @@ function ListaDeEntrevistas({ encuesta }: { encuesta: Encuesta }) {
         todas.push(...lote);
         if (lote.length < 1000) break;
       }
-      descargar(`${encuesta.clave}_entrevistas_${diaLocal(new Date(), zona)}.csv`, entrevistasACsv(encuesta, todas));
+      const muestra = await leerMuestra(encuesta.id);
+      descargar(
+        `${encuesta.clave}_entrevistas_${diaLocal(new Date(), zona)}.csv`,
+        entrevistasACsv(encuesta, todas, muestra),
+      );
     } catch (e) {
       setFalloExportar(mensajeDeError(e));
     } finally {

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, FileUp, Pencil, Trash2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import Link from 'next/link';
+import { Check, Download, FileUp, MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Encabezado } from '@/components/admin/comunes';
-import { mensajeDeError, usePanel } from '@/components/admin/contexto';
+import { mensajeDeError, useConsulta, usePanel } from '@/components/admin/contexto';
 import { Aviso, AreaTexto, Boton, Campo, Cargando, Entrada, Insignia, Modal, Selector, Tarjeta, Vacio } from '@/components/ui';
 import { revisarDefinicion, todasLasPreguntas } from '@/lib/encuesta/motor';
-import type { DefinicionEncuesta, Encuesta } from '@/lib/encuesta/tipos';
+import { type DefinicionEncuesta, type Encuesta, type TipoEncuesta, TIPOS_ENCUESTA, nombreDeTipo } from '@/lib/encuesta/tipos';
 import { descargar } from '@/lib/exportar';
 import { entero } from '@/lib/formato';
 import { supabase } from '@/lib/supabase';
@@ -35,6 +36,7 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
   const [titulo, setTitulo] = useState(actual?.titulo ?? '');
   const [descripcion, setDescripcion] = useState(actual?.descripcion ?? '');
   const [meta, setMeta] = useState(actual?.meta_muestra ? String(actual.meta_muestra) : '');
+  const [tipo, setTipo] = useState<TipoEncuesta | ''>(actual?.tipo ?? '');
   const [json, setJson] = useState('');
   const [errores, setErrores] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
@@ -48,6 +50,10 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErrores([]);
+    if (!tipo) {
+      setErrores(['Indica si la encuesta es de rigor científico o de posicionamiento.']);
+      return;
+    }
     let definicion: DefinicionEncuesta | null = null;
     if (json.trim()) {
       let dato: unknown;
@@ -71,6 +77,7 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
     setEnviando(true);
     const comunes = {
       titulo: titulo.trim(),
+      tipo,
       descripcion: descripcion.trim() || null,
       meta_muestra: meta ? Number(meta) : null,
       ...(definicion ? { definicion } : {}),
@@ -88,11 +95,41 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
   }
 
   return (
-    <Modal abierto alCerrar={alCerrar} ancho="max-w-2xl" titulo={actual ? 'Editar encuesta' : 'Importar encuesta'}>
+    <Modal abierto alCerrar={alCerrar} ancho="max-w-2xl" titulo={actual ? 'Editar encuesta' : 'Nueva encuesta'}>
       <form onSubmit={enviar} className="flex flex-col gap-4" noValidate>
         <Campo etiqueta="Título">
           {(p) => <Entrada {...p} value={titulo} onChange={(e) => setTitulo(e.target.value)} />}
         </Campo>
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-tinta-2">Tipo de encuesta</legend>
+          <div role="radiogroup" aria-label="Tipo de encuesta" className="grid gap-2 sm:grid-cols-2">
+            {TIPOS_ENCUESTA.map((t) => (
+              <button
+                key={t.valor}
+                type="button"
+                role="radio"
+                aria-checked={tipo === t.valor}
+                onClick={() => setTipo(t.valor)}
+                className={`flex gap-3 rounded-xl border p-3 text-left transition-colors ${
+                  tipo === t.valor ? 'border-marca-600 bg-marca-50' : 'border-eje bg-white hover:bg-plano'
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                    tipo === t.valor ? 'border-marca-600 bg-marca-600 text-white' : 'border-eje'
+                  }`}
+                >
+                  {tipo === t.valor && <Check className="size-3.5" strokeWidth={3} />}
+                </span>
+                <span>
+                  <span className="block font-semibold">{t.nombre}</span>
+                  <span className="mt-0.5 block text-sm leading-snug text-tinta-2">{t.ayuda}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <Campo etiqueta="Descripción (opcional)">
           {(p) => <Entrada {...p} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />}
         </Campo>
@@ -155,8 +192,8 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
           <Boton variante="secundario" onClick={alCerrar}>
             Cancelar
           </Boton>
-          <Boton type="submit" cargando={enviando} disabled={titulo.trim().length < 3}>
-            {actual ? 'Guardar cambios' : 'Importar como borrador'}
+          <Boton type="submit" cargando={enviando} disabled={titulo.trim().length < 3 || !tipo}>
+            {actual ? 'Guardar cambios' : 'Crear como borrador'}
           </Boton>
         </div>
       </form>
@@ -166,6 +203,24 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
 
 export default function PaginaEncuestas() {
   const { encuestas, cargando, recargar, elegir } = usePanel();
+  // Secciones cargadas en la muestra de cada encuesta.
+  const ids = encuestas.map((e) => e.id).join(',');
+  const consultaMuestras = useCallback(async () => {
+    const pares = await Promise.all(
+      ids
+        .split(',')
+        .filter(Boolean)
+        .map(async (id) => {
+          const { count } = await supabase()
+            .from('secciones_muestra')
+            .select('seccion', { count: 'exact', head: true })
+            .eq('encuesta_id', id);
+          return [id, count ?? 0] as const;
+        }),
+    );
+    return Object.fromEntries(pares) as Record<string, number>;
+  }, [ids]);
+  const muestras = useConsulta(consultaMuestras).datos ?? {};
   const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [aviso, setAviso] = useState<{ tono: 'bien' | 'grave'; texto: string } | null>(null);
   const [porBorrar, setPorBorrar] = useState<Encuesta | null>(null);
@@ -203,8 +258,8 @@ export default function PaginaEncuestas() {
     <>
       <Encabezado titulo="Encuestas" descripcion="Cuestionarios disponibles y su estado.">
         <Boton onClick={() => setEdicion({ tipo: 'nueva' })}>
-          <FileUp className="size-4" aria-hidden />
-          Importar encuesta
+          <Plus className="size-4" aria-hidden />
+          Nueva encuesta
         </Boton>
       </Encabezado>
 
@@ -235,7 +290,11 @@ export default function PaginaEncuestas() {
                       <Insignia tono={e.estado === 'activa' ? 'bien' : e.estado === 'cerrada' ? 'neutro' : 'aviso'}>
                         {estado.nombre}
                       </Insignia>
+                      <Insignia tono="marca">{nombreDeTipo(e.tipo)}</Insignia>
                       <span>{preguntas} preguntas</span>
+                      <span>
+                        {muestras[e.id] ? `Muestra: ${entero(muestras[e.id])} secciones` : 'Sin muestra cargada'}
+                      </span>
                       <span>Versiones {e.definicion.versiones.join(', ')}</span>
                       {e.meta_muestra && <span>Meta: {entero(e.meta_muestra)}</span>}
                     </p>
@@ -261,6 +320,14 @@ export default function PaginaEncuestas() {
                   <Boton variante="secundario" tamano="chico" onClick={() => elegir(e.id)}>
                     Ver en el panel
                   </Boton>
+                  <Link
+                    href="/admin/muestra"
+                    onClick={() => elegir(e.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-eje bg-white px-3 text-sm font-semibold hover:bg-plano"
+                  >
+                    <MapPinned className="size-3.5" aria-hidden />
+                    {muestras[e.id] ? 'Ver muestra' : 'Cargar muestra'}
+                  </Link>
                   <Boton variante="secundario" tamano="chico" onClick={() => setEdicion({ tipo: 'editar', encuesta: e })}>
                     <Pencil className="size-3.5" aria-hidden />
                     Editar
@@ -296,7 +363,7 @@ export default function PaginaEncuestas() {
               tono: 'bien',
               texto:
                 edicion.tipo === 'nueva'
-                  ? 'Encuesta importada como borrador. Actívala cuando esté lista.'
+                  ? 'Encuesta creada como borrador. Carga su muestra y actívala cuando esté lista.'
                   : 'Cambios guardados.',
             });
             setEdicion(null);

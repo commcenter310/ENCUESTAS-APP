@@ -1,6 +1,7 @@
 import { columnasDeRespuestas, etiquetaDe } from '@/lib/encuesta/motor';
 import type { Encuesta, Entrevista } from '@/lib/encuesta/tipos';
 import { diaLocal, hora } from '@/lib/formato';
+import { type SeccionMuestra, ubicarSeccion } from '@/lib/muestra';
 
 type Celda = string | number | null | undefined;
 
@@ -34,8 +35,15 @@ export type EntrevistaConNombre = Entrevista & { encuestador: { nombre: string }
 const RESULTADOS = { completa: 'Completa', no_elegible: 'No elegible' } as const;
 const REVISIONES = { pendiente: 'Pendiente', validada: 'Validada', anulada: 'Anulada' } as const;
 
-/** Una fila por entrevista y una columna por respuesta, con etiquetas legibles. */
-export function entrevistasACsv(encuesta: Encuesta, entrevistas: EntrevistaConNombre[]): string {
+/**
+ * Una fila por entrevista y una columna por respuesta, con etiquetas legibles.
+ * Con muestra cargada agrega los datos de la sección (distritos, estrato y factor).
+ */
+export function entrevistasACsv(
+  encuesta: Encuesta,
+  entrevistas: EntrevistaConNombre[],
+  muestra: SeccionMuestra[] = [],
+): string {
   const columnas = columnasDeRespuestas(encuesta.definicion);
   const zona = encuesta.zona_horaria;
   const encabezados = [
@@ -53,24 +61,42 @@ export function entrevistasACsv(encuesta: Encuesta, entrevistas: EntrevistaConNo
     'latitud',
     'longitud',
     'precision_m',
+    'seccion',
+    'distrito_local',
+    'distrito_federal',
+    'estrato',
+    'factor_ponderacion',
+    'en_muestra',
+    'reemplazo_de',
     ...columnas.map((c) => c.titulo),
   ];
-  const filas = entrevistas.map((e) => [
-    e.id,
-    diaLocal(e.terminada_en, zona),
-    hora(e.iniciada_en, zona),
-    hora(e.terminada_en, zona),
-    e.duracion_seg,
-    e.encuestador?.nombre ?? '',
-    e.version,
-    RESULTADOS[e.resultado],
-    e.motivo_no_elegible,
-    REVISIONES[e.revision],
-    e.nota_revision,
-    e.lat,
-    e.lng,
-    e.precision_m,
-    ...columnas.map((c) => etiquetaDe(c, e.respuestas[c.clave])),
-  ]);
+  const filas = entrevistas.map((e) => {
+    const ubicacion = ubicarSeccion(muestra, e.zona);
+    const fila = ubicacion.tipo === 'fuera' ? null : ubicacion.fila;
+    return [
+      e.id,
+      diaLocal(e.terminada_en, zona),
+      hora(e.iniciada_en, zona),
+      hora(e.terminada_en, zona),
+      e.duracion_seg,
+      e.encuestador?.nombre ?? '',
+      e.version,
+      RESULTADOS[e.resultado],
+      e.motivo_no_elegible,
+      REVISIONES[e.revision],
+      e.nota_revision,
+      e.lat,
+      e.lng,
+      e.precision_m,
+      e.zona,
+      fila?.distrito_local,
+      fila?.distrito_federal,
+      fila?.estrato,
+      fila?.factor_ponderacion,
+      muestra.length === 0 ? '' : fila ? 'Sí' : 'No',
+      ubicacion.tipo === 'reemplazo' ? ubicacion.fila.seccion : '',
+      ...columnas.map((c) => etiquetaDe(c, e.respuestas[c.clave])),
+    ];
+  });
   return aCsv(encabezados, filas);
 }

@@ -2,17 +2,19 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ClipboardList, FileText, LayoutDashboard, ListChecks, Smartphone, Users } from 'lucide-react';
+import { BarChart3, ClipboardList, FileText, LayoutDashboard, ListChecks, MapPinned, Smartphone, Users } from 'lucide-react';
 import { ProveedorPanel, usePanel } from '@/components/admin/contexto';
 import { MenuCuenta } from '@/components/cuenta';
 import { Marca } from '@/components/marca';
 import { useAcceso } from '@/components/sesion';
 import { Aviso, Insignia, PantallaCargando, Selector, cx } from '@/components/ui';
+import { nombreDeTipo } from '@/lib/encuesta/tipos';
 
 const SECCIONES = [
   { ruta: '/admin', nombre: 'Tablero', icono: LayoutDashboard },
   { ruta: '/admin/resultados', nombre: 'Resultados', icono: BarChart3 },
   { ruta: '/admin/entrevistas', nombre: 'Entrevistas', icono: ListChecks },
+  { ruta: '/admin/muestra', nombre: 'Muestra', icono: MapPinned },
   { ruta: '/admin/usuarios', nombre: 'Usuarios', icono: Users },
   { ruta: '/admin/encuestas', nombre: 'Encuestas', icono: FileText },
 ] as const;
@@ -75,6 +77,9 @@ function SelectorDeEncuesta() {
       )}
       <Insignia tono={encuesta.estado === 'activa' ? 'bien' : encuesta.estado === 'cerrada' ? 'neutro' : 'aviso'}>
         {ESTADOS[encuesta.estado]}
+      </Insignia>
+      <Insignia tono="marca" className="hidden sm:inline-flex">
+        {nombreDeTipo(encuesta.tipo)}
       </Insignia>
     </div>
   );

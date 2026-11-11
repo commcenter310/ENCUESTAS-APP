@@ -8,29 +8,59 @@
 import { borrar, guardar, leer } from '@/lib/almacen';
 import { esErrorDeRed, supabase } from '@/lib/supabase';
 import type { Encuesta, EntrevistaNueva, Respuestas, ResultadoEntrevista } from '@/lib/encuesta/tipos';
+import type { SeccionMuestra } from '@/lib/muestra';
 
 // ---------------------------------------------------------------------------
 // Encuestas disponibles (con copia local para trabajar sin señal)
 // ---------------------------------------------------------------------------
 
 const CAMPOS_ENCUESTA =
-  'id, clave, titulo, descripcion, definicion, estado, meta_muestra, zona_horaria, creada_en, actualizada_en';
+  'id, clave, titulo, tipo, descripcion, definicion, estado, meta_muestra, zona_horaria, creada_en, actualizada_en';
 
-export function encuestasEnCache(uid: string): Encuesta[] {
-  return leer<Encuesta[]>(`encuestas:${uid}`) ?? [];
+export const CAMPOS_MUESTRA =
+  'seccion, distrito_local, distrito_federal, meta, estrato, lista_nominal, factor_ponderacion, reemplazo';
+
+/** Encuesta tal como la usa el encuestador: con su muestra (vacía si no tiene). */
+export type EncuestaDeCampo = Encuesta & { muestra: SeccionMuestra[] };
+
+export function encuestasEnCache(uid: string): EncuestaDeCampo[] {
+  return (leer<EncuestaDeCampo[]>(`encuestas:${uid}`) ?? []).map((e) => ({ ...e, muestra: e.muestra ?? [] }));
 }
 
-/** Descarga las encuestas activas. Sin conexión devuelve la copia local. */
-export async function cargarEncuestas(uid: string): Promise<{ encuestas: Encuesta[]; deCache: boolean }> {
-  const { data, error } = await supabase()
-    .from('encuestas')
-    .select(CAMPOS_ENCUESTA)
-    .eq('estado', 'activa')
-    .order('creada_en', { ascending: true });
-  if (error || !data) return { encuestas: encuestasEnCache(uid), deCache: true };
-  const encuestas = data as unknown as Encuesta[];
-  guardar(`encuestas:${uid}`, encuestas);
-  return { encuestas, deCache: false };
+/** Lee la muestra completa de una encuesta (por páginas: la API entrega 1,000 filas a la vez). */
+export async function leerMuestra(encuestaId: string): Promise<SeccionMuestra[]> {
+  const filas: SeccionMuestra[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await supabase()
+      .from('secciones_muestra')
+      .select(CAMPOS_MUESTRA)
+      .eq('encuesta_id', encuestaId)
+      .order('seccion')
+      .range(desde, desde + 999);
+    if (error) throw error;
+    const lote = (data ?? []).map((f) => ({ ...f, factor_ponderacion: f.factor_ponderacion === null ? null : Number(f.factor_ponderacion) })) as SeccionMuestra[];
+    filas.push(...lote);
+    if (lote.length < 1000) return filas;
+  }
+}
+
+/** Descarga las encuestas activas con su muestra. Sin conexión devuelve la copia local. */
+export async function cargarEncuestas(uid: string): Promise<{ encuestas: EncuestaDeCampo[]; deCache: boolean }> {
+  try {
+    const { data, error } = await supabase()
+      .from('encuestas')
+      .select(CAMPOS_ENCUESTA)
+      .eq('estado', 'activa')
+      .order('creada_en', { ascending: true });
+    if (error || !data) throw error ?? new Error('Sin datos');
+    const encuestas = await Promise.all(
+      (data as unknown as Encuesta[]).map(async (e) => ({ ...e, muestra: await leerMuestra(e.id) })),
+    );
+    guardar(`encuestas:${uid}`, encuestas);
+    return { encuestas, deCache: false };
+  } catch {
+    return { encuestas: encuestasEnCache(uid), deCache: true };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +256,10 @@ async function enviarPendientes(uid: string): Promise<ResultadoEnvio> {
 export type AvancePropio = {
   efectivas: number;
   hoy: number;
+  /** Entrevistas propias por sección. */
   porZona: Record<string, number>;
+  /** Entrevistas de todo el equipo por sección (para respetar los topes). */
+  equipo: Record<string, number>;
   consultado_en: string;
 };
 
@@ -236,8 +269,11 @@ export function avanceEnCache(uid: string, encuestaId: string): AvancePropio | n
 
 /** Pide al servidor el avance del encuestador (RLS lo limita a lo suyo). */
 export async function cargarAvance(uid: string, encuestaId: string): Promise<AvancePropio | null> {
-  const { data, error } = await supabase().rpc('tablero_encuesta', { p_encuesta: encuestaId });
-  if (error || !data) return avanceEnCache(uid, encuestaId);
+  const [{ data, error }, conteo] = await Promise.all([
+    supabase().rpc('tablero_encuesta', { p_encuesta: encuestaId }),
+    supabase().rpc('conteo_secciones', { p_encuesta: encuestaId }),
+  ]);
+  if (error || !data || conteo.error) return avanceEnCache(uid, encuestaId);
   const tablero = data as {
     totales: { efectivas: number; hoy: number };
     por_zona: { zona: string; n: number }[];
@@ -246,6 +282,9 @@ export async function cargarAvance(uid: string, encuestaId: string): Promise<Ava
     efectivas: tablero.totales.efectivas ?? 0,
     hoy: tablero.totales.hoy ?? 0,
     porZona: Object.fromEntries(tablero.por_zona.map((z) => [z.zona, z.n])),
+    equipo: Object.fromEntries(
+      ((conteo.data ?? []) as { zona: string; efectivas: number }[]).map((z) => [z.zona, Number(z.efectivas)]),
+    ),
     consultado_en: new Date().toISOString(),
   };
   guardar(`avance:${uid}:${encuestaId}`, avance);

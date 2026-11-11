@@ -149,15 +149,26 @@ async function entrar(pagina, usuario) {
 
 const navegador = await chromium.launch();
 const errores = [];
+
+/** Candado: si la app compilada apunta a un Supabase en internet, la prueba se detiene. */
+async function soloLocal(contexto) {
+  await contexto.route(/^https:\/\/[^/]*supabase\.(co|com)\//, (ruta) => {
+    errores.push(`La app intentó usar un Supabase en internet (${new URL(ruta.request().url()).host}). Compila con el Supabase local.`);
+    return ruta.abort();
+  });
+}
 try {
   // ===== 1. Configuración inicial (escritorio) ================================
   console.log('\n1. Configuración inicial');
   const escritorio = await navegador.newContext({ viewport: { width: 1280, height: 900 }, locale: 'es-MX' });
+  await soloLocal(escritorio);
   const admin = await escritorio.newPage();
   admin.on('pageerror', (e) => errores.push(`admin: ${e.message}`));
 
   await admin.goto(`${BASE}/`);
   await admin.waitForURL('**/login');
+  await admin.waitForTimeout(1500);
+  if (errores.length > 0) throw new Error(errores.join('\n'));
   ok('sin sesión, la portada manda a iniciar sesión');
   await admin.getByRole('link', { name: 'Configurar la app' }).click();
   await admin.waitForURL('**/instalar');
@@ -196,6 +207,7 @@ try {
     geolocation: { latitude: 25.5744, longitude: -108.4706, accuracy: 12 },
     permissions: ['geolocation'],
   });
+  await soloLocal(celular);
   const campo = await celular.newPage();
   campo.on('pageerror', (e) => errores.push(`campo: ${e.message}`));
 

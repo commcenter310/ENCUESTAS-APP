@@ -563,6 +563,7 @@
     "etiquetaZona": "Sección",
     "metaPorZona": 10,
     "duracionMinimaSeg": 300,
-    "perfil": ["S2", "S1", "DOM_tipo"]
+    "perfil": ["S2", "S1", "DOM_tipo"],
+    "autollenar": { "distrito_local": "DOM_dl", "distrito_federal": "DOM_df" }
   }
 }

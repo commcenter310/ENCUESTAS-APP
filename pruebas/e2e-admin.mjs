@@ -136,11 +136,16 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   await admin.getByLabel('Estado de Encuesta Municipal Guasave').filter({ visible: true }).selectOption('activa');
   await texto('Los encuestadores pueden levantarla.').waitFor();
 
-  await admin.getByRole('button', { name: 'Importar encuesta' }).click();
+  await admin.getByRole('button', { name: 'Nueva encuesta' }).click();
   const formulario = admin.getByRole('dialog');
   await formulario.getByLabel('Título').fill('Encuesta de satisfacción');
+  afirmar(
+    await formulario.getByRole('button', { name: 'Crear como borrador' }).isDisabled(),
+    'no deja crear una encuesta sin indicar su tipo',
+  );
+  await formulario.getByRole('radio', { name: /Posicionamiento/ }).click();
   await formulario.getByLabel('Cuestionario en formato JSON').fill('{ "formato": 1, "versiones": ["A"] }');
-  await formulario.getByRole('button', { name: 'Importar como borrador' }).click();
+  await formulario.getByRole('button', { name: 'Crear como borrador' }).click();
   await formulario.getByText('Falta "introduccion.texto".').waitFor();
   ok('rechaza un cuestionario incompleto y dice qué le falta');
   await formulario.getByLabel('Cuestionario en formato JSON').fill(
@@ -169,14 +174,75 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
       cierre: { texto: 'Gracias.', declaracion: 'Declaro que la información es verídica.' },
     }),
   );
-  await formulario.getByRole('button', { name: 'Importar como borrador' }).click();
-  await texto('Encuesta importada como borrador.').waitFor();
+  await formulario.getByRole('button', { name: 'Crear como borrador' }).click();
+  await texto('Encuesta creada como borrador.').waitFor();
   await admin.getByRole('heading', { name: 'Encuesta de satisfacción' }).waitFor();
-  ok('importa una encuesta nueva desde JSON como borrador');
+  await admin.getByRole('group', { name: 'Encuesta de satisfacción' }).getByText('Posicionamiento').waitFor();
+  await admin.getByRole('group', { name: 'Encuesta Municipal Guasave' }).getByText('Rigor científico').waitFor();
+  ok('crea una encuesta nueva con su tipo (posicionamiento); Guasave queda como rigor científico');
   await captura(admin, '13-encuestas');
   const tarjeta = admin.getByRole('group', { name: 'Encuesta de satisfacción' });
   await tarjeta.getByRole('button', { name: 'Borrar' }).click();
   await admin.getByRole('button', { name: 'Sí, borrar' }).click();
   await texto('Encuesta borrada.').waitFor();
   ok('permite borrar una encuesta sin entrevistas');
+
+  // ===== 9. Muestra por sección =================================================
+  console.log('\n9. Muestra por sección');
+  await admin.getByRole('group', { name: 'Encuesta Municipal Guasave' }).getByRole('link', { name: 'Cargar muestra' }).click();
+  await admin.getByRole('heading', { name: 'Muestra', level: 1 }).waitFor();
+  await texto('Esta encuesta no tiene muestra cargada').waitFor();
+  await admin.getByRole('button', { name: 'Cargar muestra' }).first().click();
+  const carga = admin.getByRole('dialog');
+  // Archivo sin distrito federal, como el de Guasave: se indica al cargar.
+  await carga.getByLabel('Archivo de muestra').setInputFiles({
+    name: 'muestra.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('SECCIÓN;DTTO LOCAL;ENTREVISTAS;ESTRATO;REEMPLAZO\n1450;7;1;Grande;\n1451;8;3;Aleatoria;1452\n'),
+  });
+  await carga.getByText('Falta el distrito federal en 2 secciones').waitFor();
+  afirmar(await carga.getByRole('button', { name: 'Guardar muestra' }).isDisabled(), 'no deja guardar la muestra sin distrito federal');
+  await carga.getByLabel('Distrito federal para las secciones que no lo traen').fill('4');
+  await carga.getByText('2 secciones').waitFor();
+  await carga.getByText('DF 4').waitFor();
+  await carga.getByRole('button', { name: 'Guardar muestra' }).click();
+  await texto('Muestra guardada: 2 secciones, 4 entrevistas.').waitFor();
+  ok('carga la muestra desde un archivo y completa el distrito federal');
+  const enMuestra = admin.getByRole('group', { name: 'Entrevistas dentro de la muestra' });
+  afirmar(/1 ?de 4/.test((await enMuestra.innerText()).replace(/\s+/g, ' ')), 'cuenta las entrevistas ya levantadas contra la muestra');
+  await admin.getByRole('row').filter({ hasText: '1450' }).getByText('Completa').waitFor();
+  ok('marca como completa la sección que llegó a su tope');
+  await captura(admin, '14-muestra');
+
+  await ir('Tablero');
+  await texto('Avance de la muestra por sección').waitFor();
+  ok('el tablero mide el avance contra el tope de cada sección');
+
+  // --- En campo -----------------------------------------------------------------
+  await campo.getByRole('button', { name: 'Actualizar' }).click();
+  await campo.getByRole('button', { name: 'Nueva entrevista' }).filter({ visible: true }).first().click();
+  const seccion = campo.getByRole('textbox', { name: 'Sección electoral' }).filter({ visible: true });
+  await seccion.fill('1450');
+  await campo.getByText('Tope completo').filter({ visible: true }).waitFor();
+  await campo.getByRole('button', { name: 'Comenzar' }).click();
+  await campo.getByText(/ya completó su tope \(1 de 1 entrevistas\)/).filter({ visible: true }).waitFor();
+  ok('no deja iniciar una entrevista en una sección que ya llegó a su tope');
+  await seccion.fill('9999');
+  await campo.getByRole('button', { name: 'Comenzar' }).click();
+  await campo.getByText(/no está en la muestra/).filter({ visible: true }).first().waitFor();
+  ok('rechaza una sección fuera de la muestra');
+  await seccion.fill('1452');
+  await campo.getByText('Es el reemplazo de la sección 1451').filter({ visible: true }).waitFor();
+  await campo.getByText('El equipo lleva').filter({ visible: true }).waitFor();
+  ok('acepta la sección de reemplazo con aviso y muestra el avance del equipo');
+  await campo.getByRole('button', { name: 'Ver secciones de la muestra' }).click();
+  const lista = campo.getByRole('dialog');
+  await lista.getByText('0/3').waitFor();
+  afirmar((await lista.getByRole('button', { name: /^1450/ }).count()) === 0, 'la lista de secciones oculta las que ya completaron su tope');
+  await lista.getByRole('button', { name: /^1451/ }).click();
+  afirmar((await seccion.inputValue()) === '1451', 'elegir de la lista llena la sección');
+  await captura(campo, '15-seccion-muestra');
+  await campo.getByRole('button', { name: 'Comenzar' }).click();
+  await campo.getByRole('button', { name: 'Iniciar preguntas' }).waitFor();
+  ok('inicia la entrevista en una sección de la muestra con lugar disponible');
 }

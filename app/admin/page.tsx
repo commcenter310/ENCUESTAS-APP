@@ -10,6 +10,8 @@ import { Aviso, Insignia, Tarjeta, Vacio, cx } from '@/components/ui';
 import { columnasDeRespuestas, resumirConteo, type Conteo } from '@/lib/encuesta/motor';
 import type { Encuesta } from '@/lib/encuesta/tipos';
 import { duracion, entero, haceCuanto, porcentaje } from '@/lib/formato';
+import { leerMuestra } from '@/lib/campo';
+import { levantadasEn } from '@/lib/muestra';
 import { supabase } from '@/lib/supabase';
 
 type Totales = {
@@ -55,15 +57,20 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
   const clavesPerfil = useMemo(() => def.monitoreo?.perfil ?? [], [def]);
 
   const consulta = useCallback(async () => {
-    const [tablero, perfil] = await Promise.all([
+    const [tablero, perfil, muestra] = await Promise.all([
       supabase().rpc('tablero_encuesta', { p_encuesta: encuesta.id }),
       clavesPerfil.length > 0
-        ? supabase().rpc('resultados_encuesta', { p_encuesta: encuesta.id, p_claves: clavesPerfil })
+        ? supabase().rpc('resultados_encuesta', {
+            p_encuesta: encuesta.id,
+            p_claves: clavesPerfil,
+          })
         : Promise.resolve({ data: {}, error: null }),
+      leerMuestra(encuesta.id),
     ]);
     return {
       tablero: exigir(tablero) as Tablero,
       perfil: exigir(perfil) as Record<string, Conteo>,
+      muestra,
     };
   }, [encuesta.id, clavesPerfil]);
 
@@ -74,6 +81,30 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
   const etiquetaZona = def.monitoreo?.etiquetaZona ?? 'Zona';
   const minimo = def.monitoreo?.duracionMinimaSeg ?? 0;
   const columnas = useMemo(() => columnasDeRespuestas(def), [def]);
+
+  // Con muestra cargada, el avance por sección se mide contra el tope de cada una.
+  const avanceMuestra = useMemo(() => {
+    if (!datos || datos.muestra.length === 0) return null;
+    const conteo = Object.fromEntries(datos.tablero.por_zona.map((z) => [z.zona, z.n]));
+    const filas = datos.muestra
+      .map((s) => ({ ...s, n: levantadasEn(s, conteo) }))
+      .sort((a, b) => Number(a.seccion) - Number(b.seccion));
+    const enMuestra = new Set(datos.muestra.flatMap((s) => [s.seccion, s.reemplazo].filter(Boolean)));
+    const porDl = new Map<string, { meta: number; n: number }>();
+    for (const f of filas) {
+      const clave = f.distrito_local === null ? 'Sin dato' : `DL ${f.distrito_local}`;
+      const g = porDl.get(clave) ?? { meta: 0, n: 0 };
+      g.meta += f.meta;
+      g.n += Math.min(f.n, f.meta);
+      porDl.set(clave, g);
+    }
+    return {
+      filas,
+      completas: filas.filter((f) => f.n >= f.meta).length,
+      fuera: datos.tablero.por_zona.filter((z) => z.zona && !enMuestra.has(z.zona)).reduce((s, z) => s + z.n, 0),
+      porDl: [...porDl.entries()],
+    };
+  }, [datos]);
 
   return (
     <>
@@ -151,11 +182,19 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
               valor={entero(datos.tablero.totales.no_elegibles)}
               detalle="Terminadas por los filtros"
             />
-            <Cifra
-              etiqueta={`${etiquetaZona === 'Sección' ? 'Secciones' : 'Zonas'} con avance`}
-              valor={entero(datos.tablero.totales.zonas)}
-              detalle={metaZona ? `Meta: ${metaZona} por ${etiquetaZona.toLowerCase()}` : undefined}
-            />
+            {avanceMuestra ? (
+              <Cifra
+                etiqueta={`${etiquetaZona === 'Sección' ? 'Secciones' : 'Zonas'} completas`}
+                valor={entero(avanceMuestra.completas)}
+                detalle={`de ${entero(avanceMuestra.filas.length)} en la muestra${avanceMuestra.fuera ? ` · ${entero(avanceMuestra.fuera)} fuera de muestra` : ''}`}
+              />
+            ) : (
+              <Cifra
+                etiqueta={`${etiquetaZona === 'Sección' ? 'Secciones' : 'Zonas'} con avance`}
+                valor={entero(datos.tablero.totales.zonas)}
+                detalle={metaZona ? `Meta: ${metaZona} por ${etiquetaZona.toLowerCase()}` : undefined}
+              />
+            )}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-5">
@@ -238,39 +277,82 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
             )}
           </Tarjeta>
 
-          {/* Avance por zona */}
-          <Tarjeta className="p-5">
-            <TituloDeBloque
-              detalle={metaZona ? `Meta: ${metaZona} efectivas por ${etiquetaZona.toLowerCase()}` : undefined}
-            >
-              Avance por {etiquetaZona.toLowerCase()}
-            </TituloDeBloque>
-            {datos.tablero.por_zona.length === 0 ? (
-              <p className="py-6 text-center text-sm text-tinta-3">Aparecerá con las primeras entrevistas.</p>
-            ) : (
-              <ul className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
-                {[...datos.tablero.por_zona]
-                  .sort((a, b) => a.zona.localeCompare(b.zona, 'es', { numeric: true }))
-                  .map((z) => (
-                    <li key={z.zona} className="text-sm">
-                      <div className="mb-1 flex items-baseline justify-between gap-2">
-                        <span className="truncate font-medium">{z.zona || `Sin ${etiquetaZona.toLowerCase()}`}</span>
-                        <span className="shrink-0 text-tinta-2 tabular-nums">
-                          {entero(z.n)}
-                          {metaZona ? ` / ${metaZona}` : ''}
-                          {metaZona && z.n >= metaZona && (
-                            <CheckCircle2 className="ml-1 inline size-4 text-bien" aria-label="Meta cumplida" />
-                          )}
-                        </span>
-                      </div>
-                      {metaZona && (
-                        <Medidor valor={z.n} meta={metaZona} etiqueta={`${etiquetaZona} ${z.zona}`} />
-                      )}
-                    </li>
-                  ))}
+          {/* Avance por zona, contra la muestra */}
+          {avanceMuestra && (
+            <Tarjeta className="p-5">
+              <TituloDeBloque
+                detalle={
+                  <Link href="/admin/muestra" className="font-medium text-marca-700 hover:underline">
+                    Ver detalle de la muestra
+                  </Link>
+                }
+              >
+                Avance de la muestra por {etiquetaZona.toLowerCase()}
+              </TituloDeBloque>
+              <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {avanceMuestra.porDl.map(([nombre, g]) => (
+                  <div key={nombre} className="text-sm">
+                    <div className="mb-1 flex items-baseline justify-between gap-2">
+                      <span className="font-semibold">{nombre}</span>
+                      <span className="text-tinta-2 tabular-nums">
+                        {entero(g.n)} / {entero(g.meta)}
+                      </span>
+                    </div>
+                    <Medidor valor={g.n} meta={g.meta} etiqueta={nombre} />
+                  </div>
+                ))}
+              </div>
+              <ul className="grid grid-cols-3 gap-x-5 gap-y-2.5 sm:grid-cols-5 lg:grid-cols-8">
+                {avanceMuestra.filas.map((f) => (
+                  <li key={f.seccion} className="text-xs">
+                    <div className="mb-0.5 flex items-baseline justify-between gap-1">
+                      <span className="font-medium">{f.seccion}</span>
+                      <span
+                        className={cx('tabular-nums', f.n > f.meta ? 'font-semibold text-aviso-texto' : 'text-tinta-2')}
+                      >
+                        {f.n}/{f.meta}
+                      </span>
+                    </div>
+                    <Medidor valor={f.n} meta={f.meta} etiqueta={`${etiquetaZona} ${f.seccion}`} />
+                  </li>
+                ))}
               </ul>
-            )}
-          </Tarjeta>
+            </Tarjeta>
+          )}
+
+          {/* Avance por zona (sin muestra) */}
+          {!avanceMuestra && (
+            <Tarjeta className="p-5">
+              <TituloDeBloque
+                detalle={metaZona ? `Meta: ${metaZona} efectivas por ${etiquetaZona.toLowerCase()}` : undefined}
+              >
+                Avance por {etiquetaZona.toLowerCase()}
+              </TituloDeBloque>
+              {datos.tablero.por_zona.length === 0 ? (
+                <p className="py-6 text-center text-sm text-tinta-3">Aparecerá con las primeras entrevistas.</p>
+              ) : (
+                <ul className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {[...datos.tablero.por_zona]
+                    .sort((a, b) => a.zona.localeCompare(b.zona, 'es', { numeric: true }))
+                    .map((z) => (
+                      <li key={z.zona} className="text-sm">
+                        <div className="mb-1 flex items-baseline justify-between gap-2">
+                          <span className="truncate font-medium">{z.zona || `Sin ${etiquetaZona.toLowerCase()}`}</span>
+                          <span className="shrink-0 text-tinta-2 tabular-nums">
+                            {entero(z.n)}
+                            {metaZona ? ` / ${metaZona}` : ''}
+                            {metaZona && z.n >= metaZona && (
+                              <CheckCircle2 className="ml-1 inline size-4 text-bien" aria-label="Meta cumplida" />
+                            )}
+                          </span>
+                        </div>
+                        {metaZona && <Medidor valor={z.n} meta={metaZona} etiqueta={`${etiquetaZona} ${z.zona}`} />}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </Tarjeta>
+          )}
         </div>
       )}
     </>

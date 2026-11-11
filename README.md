@@ -45,9 +45,22 @@ npm run build && npm run start   # en otra terminal
 npm run e2e          # recorrido completo en navegador (solo en local, con base recién reiniciada)
 ```
 
+## Muestra por sección
+
+Cada encuesta puede tener una **muestra**: las secciones que se levantan, su distrito local y federal, y el tope de entrevistas de cada una (panel → **Muestra → Cargar muestra**).
+
+- Acepta Excel (.xlsx) o CSV. Toma todas las hojas que tengan una columna de sección y una de entrevistas (p. ej. "Grandes" y "Aleatorias"); las hojas que solo traen sección y distritos (p. ej. "Zona de aplicación") se usan para completar distritos. Si aun así falta el distrito federal o local, se indica uno para todas al cargar.
+- Columnas reconocidas: SECCIÓN, DTTO/DISTRITO LOCAL, DTTO/DISTRITO FEDERAL, ENTREVISTAS (o ENTREVISTAS A LEVANTAR, CUOTA, META), y opcionales ESTRATO, LISTA NOMINAL, FACTOR DE PONDERACIÓN, REEMPLAZO. Hay una plantilla CSV descargable.
+- En campo, con muestra cargada: solo se aceptan secciones de la muestra; la de reemplazo se acepta con aviso y cuenta para su titular; una sección que llegó a su tope no deja iniciar entrevistas. El conteo es de todo el equipo, según la última vez que el teléfono tuvo señal, así que sin conexión puede haber algún excedente: el panel lo marca.
+- Los distritos se llenan solos en las preguntas indicadas en `monitoreo.autollenar` de la definición.
+
+## Tipo de encuesta
+
+Al crear una encuesta se elige si es de **rigor científico** o de **posicionamiento** (columna `encuestas.tipo`).
+
 ## Agregar otra encuesta
 
-En el panel: **Encuestas → Importar encuesta** y pega el JSON del cuestionario (formato documentado en `lib/encuesta/tipos.ts`; ejemplo completo en `encuestas/guasave-ims.json`). Nace como borrador; actívala cuando esté lista.
+En el panel: **Encuestas → Nueva encuesta**, elige el tipo y pega el JSON del cuestionario (formato documentado en `lib/encuesta/tipos.ts`; ejemplo completo en `encuestas/guasave-ims.json`). Nace como borrador; actívala cuando esté lista.
 
 ## Primer administrador
 

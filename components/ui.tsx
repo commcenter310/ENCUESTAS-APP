@@ -71,8 +71,13 @@ export function Boton({
 // Campos de formulario
 // ---------------------------------------------------------------------------
 
+/** Ancho completo, salvo que quien lo usa indique otro ancho (w-auto, w-28, max-w-…). */
+function ancho(className?: string): string | false {
+  return !/(^|\s)w-/.test(className ?? '') && 'w-full';
+}
+
 const ESTILO_ENTRADA =
-  'w-full rounded-xl border border-eje bg-white px-3.5 text-tinta placeholder:text-tinta-3 focus:border-marca-500 focus:outline-none focus:ring-2 focus:ring-marca-500/25 disabled:bg-plano disabled:text-tinta-3';
+  'rounded-xl border border-eje bg-white px-3.5 text-tinta placeholder:text-tinta-3 focus:border-marca-500 focus:outline-none focus:ring-2 focus:ring-marca-500/25 disabled:bg-plano disabled:text-tinta-3';
 
 export function Campo({
   etiqueta,
@@ -106,16 +111,16 @@ export function Campo({
 }
 
 export function Entrada({ className, ...resto }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx(ESTILO_ENTRADA, 'h-12', className)} {...resto} />;
+  return <input className={cx(ESTILO_ENTRADA, ancho(className), 'h-12', className)} {...resto} />;
 }
 
 export function AreaTexto({ className, ...resto }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cx(ESTILO_ENTRADA, 'min-h-28 py-3 leading-snug', className)} {...resto} />;
+  return <textarea className={cx(ESTILO_ENTRADA, 'w-full min-h-28 py-3 leading-snug', className)} {...resto} />;
 }
 
 export function Selector({ className, children, ...resto }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cx(ESTILO_ENTRADA, 'h-11 pr-8', className)} {...resto}>
+    <select className={cx(ESTILO_ENTRADA, ancho(className), 'h-11 pr-8', className)} {...resto}>
       {children}
     </select>
   );

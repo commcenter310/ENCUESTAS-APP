@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, MapPin, MapPinOff, Megaphone, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, List, MapPin, MapPinOff, Megaphone, X } from 'lucide-react';
 import { CampoDePregunta, type Cambios } from '@/components/campo/pregunta';
-import { Aviso, Boton, Modal, cx } from '@/components/ui';
+import { Aviso, Boton, Entrada, Modal, cx } from '@/components/ui';
 import {
   type AvancePropio,
   type Borrador,
+  type EncuestaDeCampo,
   borrarBorrador,
   encolar,
   guardarArranque,
@@ -20,11 +21,52 @@ import {
   preguntasVisibles,
   validarPregunta,
 } from '@/lib/encuesta/motor';
-import type { Encuesta, EntrevistaNueva, Respuestas, ResultadoEntrevista } from '@/lib/encuesta/tipos';
+import type { EntrevistaNueva, Respuestas, ResultadoEntrevista } from '@/lib/encuesta/tipos';
+import { type SeccionMuestra, type UbicacionSeccion, levantadasEn, ubicarSeccion } from '@/lib/muestra';
 import { supabase } from '@/lib/supabase';
 
+/** Situación de la sección elegida respecto a la muestra y su tope. */
+type EstadoSeccion = {
+  seccion: string;
+  ubicacion: UbicacionSeccion;
+  /** Entrevistas que ya cuentan para la sección (todo el equipo + pendientes de este teléfono). */
+  levantadas: number;
+  /** Entrevistas propias en la sección. */
+  propias: number;
+  llena: boolean;
+};
+
+function sumar(...mapas: Record<string, number>[]): Record<string, number> {
+  const total: Record<string, number> = {};
+  for (const m of mapas) for (const [k, v] of Object.entries(m)) total[k] = (total[k] ?? 0) + v;
+  return total;
+}
+
+/** Revisa la sección contra la muestra. Sin muestra cargada devuelve null (se acepta cualquiera). */
+function revisarSeccion(
+  muestra: SeccionMuestra[],
+  valor: unknown,
+  avance: AvancePropio | null,
+  pendientes: Record<string, number>,
+): EstadoSeccion | null {
+  if (muestra.length === 0 || valor === undefined || valor === null || valor === '') return null;
+  const seccion = String(valor);
+  const ubicacion = ubicarSeccion(muestra, seccion);
+  const conteo = sumar(avance?.equipo ?? {}, pendientes);
+  const propio = sumar(avance?.porZona ?? {}, pendientes);
+  if (ubicacion.tipo === 'fuera') return { seccion, ubicacion, levantadas: 0, propias: 0, llena: false };
+  const levantadas = levantadasEn(ubicacion.fila, conteo);
+  return {
+    seccion,
+    ubicacion,
+    levantadas,
+    propias: levantadasEn(ubicacion.fila, propio),
+    llena: levantadas >= ubicacion.fila.meta,
+  };
+}
+
 type Props = {
-  encuesta: Encuesta;
+  encuesta: EncuestaDeCampo;
   encuestador: { id: string; nombre: string };
   inicial: Borrador;
   avance: AvancePropio | null;
@@ -68,6 +110,7 @@ export function Entrevista({
   const [guardando, setGuardando] = useState(false);
   const [menu, setMenu] = useState(false);
   const [confirmarDescarte, setConfirmarDescarte] = useState(false);
+  const [listaSecciones, setListaSecciones] = useState(false);
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const actual = useRef(borrador);
   /** true cuando la entrevista ya se guardó o la pantalla se cerró. */
@@ -127,7 +170,35 @@ export function Entrevista({
           return;
         }
       }
-      irA('intro', { iniciada_en: b.iniciada_en ?? new Date().toISOString() });
+      // Con muestra cargada: la sección debe estar en ella y no haber llegado a su tope.
+      const campo = def.monitoreo?.campoZona;
+      const estado = campo ? revisarSeccion(encuesta.muestra, b.respuestas[campo], avance, pendientesPorZona) : null;
+      const etiqueta = (def.monitoreo?.etiquetaZona ?? 'Sección').toLowerCase();
+      if (estado?.ubicacion.tipo === 'fuera') {
+        setError(`La ${etiqueta} ${estado.seccion} no está en la muestra de esta encuesta. Revisa el número o elige una de la lista.`);
+        return;
+      }
+      let respuestas = b.respuestas;
+      if (estado) {
+        // Titular o reemplazo (las que están fuera ya se rechazaron arriba).
+        const fila = estado.ubicacion.fila;
+        if (estado.llena) {
+          setError(
+            `La ${etiqueta} ${fila.seccion} ya completó su tope (${estado.levantadas} de ${fila.meta} entrevistas). Elige otra de la muestra.`,
+          );
+          return;
+        }
+        // Distritos de la muestra en las preguntas que lo piden (si están vacías).
+        const autollenar = def.monitoreo?.autollenar;
+        respuestas = { ...respuestas };
+        if (autollenar?.distrito_local && respuestas[autollenar.distrito_local] === undefined && fila.distrito_local) {
+          respuestas[autollenar.distrito_local] = fila.distrito_local;
+        }
+        if (autollenar?.distrito_federal && respuestas[autollenar.distrito_federal] === undefined && fila.distrito_federal) {
+          respuestas[autollenar.distrito_federal] = fila.distrito_federal;
+        }
+      }
+      irA('intro', { iniciada_en: b.iniciada_en ?? new Date().toISOString(), respuestas });
       // La ubicación se pide sin detener la entrevista.
       if (b.lat === null) {
         obtenerUbicacion().then((u) => {
@@ -163,7 +234,7 @@ export function Entrevista({
       return;
     }
     irA(pasos[i + 1]?.pregunta.id ?? 'cierre', { respuestas: limpias });
-  }, [actualizar, def, irA]);
+  }, [actualizar, def, irA, encuesta.muestra, avance, pendientesPorZona]);
 
   const atras = useCallback(() => {
     const b = actual.current;
@@ -249,9 +320,12 @@ export function Entrevista({
   // --- Datos de la zona (sección) para el arranque ---------------------------
   const campoZona = def.monitoreo?.campoZona;
   const zonaActual = campoZona && respuestas[campoZona] !== undefined ? String(respuestas[campoZona]) : null;
+  const conMuestra = encuesta.muestra.length > 0;
   const hechasEnZona = zonaActual
     ? (avance?.porZona[zonaActual] ?? 0) + (pendientesPorZona[zonaActual] ?? 0)
     : null;
+  const estadoZona = revisarSeccion(encuesta.muestra, zonaActual, avance, pendientesPorZona);
+  const etiquetaZona = def.monitoreo?.etiquetaZona ?? 'Sección';
 
   const total = visibles.length;
   const progreso =
@@ -315,12 +389,31 @@ export function Entrevista({
               <CampoDePregunta def={def} pregunta={p} version={version} respuestas={respuestas} alCambiar={cambiar} />
             </div>
           ))}
-          {zonaActual && hechasEnZona !== null && (
+          {conMuestra && campoZona && (
+            <Boton variante="secundario" className="self-start" onClick={() => setListaSecciones(true)}>
+              <List className="size-4" aria-hidden />
+              Ver {etiquetaZona.toLowerCase() === 'sección' ? 'secciones' : 'zonas'} de la muestra
+            </Boton>
+          )}
+          {conMuestra && estadoZona && <InfoSeccion estado={estadoZona} etiqueta={etiquetaZona} />}
+          {!conMuestra && zonaActual && hechasEnZona !== null && (
             <p className="text-[15px] text-tinta-2" role="status">
               Llevas <strong className="font-semibold text-tinta">{hechasEnZona}</strong>
               {def.monitoreo?.metaPorZona ? ` de ${def.monitoreo.metaPorZona}` : ''} entrevistas en{' '}
-              {(def.monitoreo?.etiquetaZona ?? 'zona').toLowerCase()} {zonaActual}.
+              {etiquetaZona.toLowerCase()} {zonaActual}.
             </p>
+          )}
+          {listaSecciones && campoZona && (
+            <ListaDeSecciones
+              muestra={encuesta.muestra}
+              conteo={sumar(avance?.equipo ?? {}, pendientesPorZona)}
+              etiqueta={etiquetaZona}
+              alElegir={(seccion) => {
+                cambiar({ [campoZona]: Number(seccion) });
+                setListaSecciones(false);
+              }}
+              alCerrar={() => setListaSecciones(false)}
+            />
           )}
         </div>
       )}
@@ -535,5 +628,115 @@ function Pie({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sección de la muestra
+// ---------------------------------------------------------------------------
+
+function InfoSeccion({ estado, etiqueta }: { estado: EstadoSeccion; etiqueta: string }) {
+  const { ubicacion } = estado;
+  if (ubicacion.tipo === 'fuera') {
+    return (
+      <Aviso tono="grave" titulo={`${etiqueta} ${estado.seccion} fuera de la muestra`}>
+        No está en la lista de esta encuesta. Revisa el número o elige una de la lista.
+      </Aviso>
+    );
+  }
+  const fila = ubicacion.fila;
+  const datos = [
+    fila.distrito_local ? `Distrito local ${fila.distrito_local}` : null,
+    fila.distrito_federal ? `Distrito federal ${fila.distrito_federal}` : null,
+    fila.estrato,
+  ].filter(Boolean);
+  return (
+    <div className="flex flex-col gap-3" role="status">
+      {ubicacion.tipo === 'reemplazo' && (
+        <Aviso tono="aviso" titulo={`Es el reemplazo de la ${etiqueta.toLowerCase()} ${fila.seccion}`}>
+          Úsala solo si la titular es inaccesible. Lo que levantes aquí cuenta para el tope de la {fila.seccion}.
+        </Aviso>
+      )}
+      {estado.llena ? (
+        <Aviso tono="grave" titulo="Tope completo">
+          Esta {etiqueta.toLowerCase()} ya tiene {estado.levantadas} de {fila.meta} entrevistas. Elige otra de la muestra.
+        </Aviso>
+      ) : (
+        <div className="rounded-xl border border-linea bg-white px-4 py-3 text-[15px]">
+          {datos.length > 0 && <p className="text-tinta-2">{datos.join(' · ')}</p>}
+          <p className="mt-1">
+            El equipo lleva <strong className="font-semibold">{estado.levantadas}</strong> de{' '}
+            <strong className="font-semibold">{fila.meta}</strong> entrevistas
+            {estado.propias > 0 && <span className="text-tinta-2"> (tú: {estado.propias})</span>}.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListaDeSecciones({
+  muestra,
+  conteo,
+  etiqueta,
+  alElegir,
+  alCerrar,
+}: {
+  muestra: SeccionMuestra[];
+  conteo: Record<string, number>;
+  etiqueta: string;
+  alElegir: (seccion: string) => void;
+  alCerrar: () => void;
+}) {
+  const [busqueda, setBusqueda] = useState('');
+  const [verLlenas, setVerLlenas] = useState(false);
+  const filas = muestra
+    .map((f) => ({ fila: f, levantadas: levantadasEn(f, conteo) }))
+    .filter(({ fila, levantadas }) => verLlenas || levantadas < fila.meta)
+    .filter(({ fila }) => !busqueda || fila.seccion.startsWith(busqueda.trim()) || fila.reemplazo?.startsWith(busqueda.trim()))
+    .sort((a, b) => Number(a.fila.seccion) - Number(b.fila.seccion));
+  return (
+    <Modal abierto titulo={`${etiqueta === 'Sección' ? 'Secciones' : 'Zonas'} de la muestra`} alCerrar={alCerrar}>
+      <div className="flex flex-col gap-3">
+        <Entrada
+          aria-label="Buscar número"
+          inputMode="numeric"
+          placeholder="Buscar número"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value.replace(/\D/g, ''))}
+        />
+        <label className="flex items-center gap-2 text-sm text-tinta-2">
+          <input type="checkbox" className="size-4 accent-marca-600" checked={verLlenas} onChange={(e) => setVerLlenas(e.target.checked)} />
+          Mostrar también las que ya completaron su tope
+        </label>
+        <p className="text-xs text-tinta-3">Avance del equipo según la última vez que hubo conexión.</p>
+        <ul className="divide-y divide-linea rounded-xl border border-linea">
+          {filas.length === 0 && <li className="px-3 py-4 text-center text-sm text-tinta-3">Sin resultados.</li>}
+          {filas.map(({ fila, levantadas }) => {
+            const llena = levantadas >= fila.meta;
+            return (
+              <li key={fila.seccion}>
+                <button
+                  type="button"
+                  disabled={llena}
+                  onClick={() => alElegir(fila.seccion)}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-plano disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="w-14 font-semibold tabular-nums">{fila.seccion}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-tinta-2">
+                    {[fila.distrito_local && `DL ${fila.distrito_local}`, fila.estrato, fila.reemplazo && `reemplazo ${fila.reemplazo}`]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                  <span className={cx('shrink-0 text-sm tabular-nums', llena ? 'text-bien-texto' : 'text-tinta-2')}>
+                    {levantadas}/{fila.meta}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </Modal>
   );
 }

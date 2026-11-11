@@ -23,6 +23,7 @@ import { pedirPersistencia } from '@/lib/almacen';
 import {
   type AvancePropio,
   type Borrador,
+  type EncuestaDeCampo,
   type EstadoEnvio,
   type Pendiente,
   type Registro,
@@ -41,7 +42,7 @@ import {
   sincronizar,
 } from '@/lib/campo';
 import { siguienteVersion } from '@/lib/encuesta/motor';
-import type { Encuesta, ResultadoEntrevista } from '@/lib/encuesta/tipos';
+import type { ResultadoEntrevista } from '@/lib/encuesta/tipos';
 import { diaLocal, entero, hora } from '@/lib/formato';
 
 const CADA_CUANTO_REINTENTAR_MS = 45000;
@@ -52,7 +53,7 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
 
   // Esta pantalla solo existe en el navegador (después de iniciar sesión), así
   // que puede arrancar con lo que ya está guardado en el dispositivo.
-  const [encuestas, setEncuestas] = useState<Encuesta[]>(() => encuestasEnCache(uid));
+  const [encuestas, setEncuestas] = useState<EncuestaDeCampo[]>(() => encuestasEnCache(uid));
   const [cargando, setCargando] = useState(() => encuestasEnCache(uid).length === 0);
   const [deCache, setDeCache] = useState(false);
   const [avances, setAvances] = useState<Record<string, AvancePropio | null>>(() =>
@@ -66,7 +67,7 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
   const [enviando, setEnviando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
   /** Confirmación para descartar la entrevista a medias (y, si aplica, abrir una nueva). */
-  const [confirmar, setConfirmar] = useState<{ nueva: Encuesta | null } | null>(null);
+  const [confirmar, setConfirmar] = useState<{ nueva: EncuestaDeCampo | null } | null>(null);
   const montado = useRef(true);
   const primeraVez = useRef(true);
 
@@ -77,7 +78,7 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
   }, [uid]);
 
   const cargarAvances = useCallback(
-    async (lista: Encuesta[]) => {
+    async (lista: EncuestaDeCampo[]) => {
       const pares = await Promise.all(
         lista.map(async (e) => [e.id, await cargarAvance(uid, e.id)] as const),
       );
@@ -150,7 +151,7 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
     else setEnEntrevista(false);
   }, []);
 
-  function iniciar(encuesta: Encuesta) {
+  function iniciar(encuesta: EncuestaDeCampo) {
     const nuevo: Borrador = {
       id: nuevoId(),
       encuesta_id: encuesta.id,
