@@ -5,10 +5,6 @@ import { guardar, leerCrudo, suscribir } from '@/lib/almacen';
 import type { Encuesta } from '@/lib/encuesta/tipos';
 import { esErrorDeRed, supabase } from '@/lib/supabase';
 
-// ---------------------------------------------------------------------------
-// Consultas con recarga
-// ---------------------------------------------------------------------------
-
 type EstadoConsulta<T> = { datos: T | null; error: string | null; cargando: boolean; actualizando: boolean };
 
 export function mensajeDeError(e: unknown): string {
@@ -70,14 +66,13 @@ export function exigir<T>(respuesta: { data: T | null; error: { message: string 
   return respuesta.data as T;
 }
 
-// ---------------------------------------------------------------------------
-// Encuesta seleccionada en el panel
-// ---------------------------------------------------------------------------
+/** Encuesta del panel, con el número de secciones de su muestra. */
+export type EncuestaDelPanel = Encuesta & { secciones: number };
 
 type ContextoPanel = {
-  encuestas: Encuesta[];
+  encuestas: EncuestaDelPanel[];
   /** Encuesta que se está viendo en el panel (null si no hay ninguna). */
-  encuesta: Encuesta | null;
+  encuesta: EncuestaDelPanel | null;
   elegir: (id: string) => void;
   cargando: boolean;
   error: string | null;
@@ -94,9 +89,14 @@ const sinEleccion = () => null;
 export function ProveedorPanel({ children }: { children: React.ReactNode }) {
   const consulta = useCallback(
     async () =>
-      exigir(
-        await supabase().from('encuestas').select('*').order('creada_en', { ascending: true }),
-      ) as unknown as Encuesta[],
+      (
+        exigir(
+          await supabase()
+            .from('encuestas')
+            .select('*, secciones_muestra(count)')
+            .order('creada_en', { ascending: true }),
+        ) as (Encuesta & { secciones_muestra: { count: number }[] })[]
+      ).map(({ secciones_muestra, ...e }) => ({ ...e, secciones: secciones_muestra[0]?.count ?? 0 })),
     [],
   );
   const { datos, cargando, error, recargar } = useConsulta(consulta);
@@ -111,10 +111,7 @@ export function ProveedorPanel({ children }: { children: React.ReactNode }) {
       elegida = null;
     }
     const encuesta =
-      encuestas.find((e) => e.id === elegida) ??
-      encuestas.find((e) => e.estado === 'activa') ??
-      encuestas[0] ??
-      null;
+      encuestas.find((e) => e.id === elegida) ?? encuestas.find((e) => e.estado === 'activa') ?? encuestas[0] ?? null;
     return { encuestas, encuesta, elegir: (id) => guardar(CLAVE, id), cargando, error, recargar };
   }, [datos, cruda, cargando, error, recargar]);
 

@@ -5,7 +5,6 @@ import { usePanel } from '@/components/admin/contexto';
 import { Aviso, Boton, Cargando, Tarjeta, Vacio, cx } from '@/components/ui';
 import type { Encuesta } from '@/lib/encuesta/tipos';
 
-/** Encabezado de cada pantalla del panel: título, descripción y acciones. */
 export function Encabezado({
   titulo,
   descripcion,
@@ -35,7 +34,6 @@ export function BotonActualizar({ alOprimir, girando }: { alOprimir: () => void;
   );
 }
 
-/** Título de un bloque dentro de una tarjeta. */
 export function TituloDeBloque({ children, detalle }: { children: React.ReactNode; detalle?: React.ReactNode }) {
   return (
     <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

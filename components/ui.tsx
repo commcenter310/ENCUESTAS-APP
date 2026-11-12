@@ -2,27 +2,22 @@
 
 import { useEffect, useId, useRef } from 'react';
 import { AlertTriangle, CheckCircle2, Info, Loader2, X, XCircle } from 'lucide-react';
+import { twMerge } from 'tailwind-merge';
 
-/** Une clases ignorando valores vacíos. */
+/** Une clases ignorando valores vacíos; ante clases de Tailwind en conflicto gana la última. */
 export function cx(...clases: (string | false | null | undefined)[]): string {
-  return clases.filter(Boolean).join(' ');
+  return twMerge(clases.filter(Boolean).join(' '));
 }
-
-// ---------------------------------------------------------------------------
-// Botón
-// ---------------------------------------------------------------------------
 
 type Variante = 'primario' | 'secundario' | 'fantasma' | 'peligro';
 type Tamano = 'chico' | 'normal' | 'grande';
 
 const VARIANTES: Record<Variante, string> = {
-  primario:
-    'bg-marca-600 text-white hover:bg-marca-700 active:bg-marca-800 disabled:bg-marca-200 disabled:text-white',
+  primario: 'bg-marca-600 text-white hover:bg-marca-700 active:bg-marca-800 disabled:bg-marca-200 disabled:text-white',
   secundario:
     'bg-white text-tinta border border-eje hover:bg-plano active:bg-linea disabled:text-tinta-3 disabled:bg-white',
   fantasma: 'text-tinta-2 hover:bg-black/5 active:bg-black/10 disabled:text-tinta-3',
-  peligro:
-    'bg-white text-grave-texto border border-grave/40 hover:bg-grave/5 active:bg-grave/10 disabled:opacity-50',
+  peligro: 'bg-white text-grave-texto border border-grave/40 hover:bg-grave/5 active:bg-grave/10 disabled:opacity-50',
 };
 
 const TAMANOS: Record<Tamano, string> = {
@@ -67,17 +62,8 @@ export function Boton({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Campos de formulario
-// ---------------------------------------------------------------------------
-
-/** Ancho completo, salvo que quien lo usa indique otro ancho (w-auto, w-28, max-w-…). */
-function ancho(className?: string): string | false {
-  return !/(^|\s)w-/.test(className ?? '') && 'w-full';
-}
-
 const ESTILO_ENTRADA =
-  'rounded-xl border border-eje bg-white px-3.5 text-tinta placeholder:text-tinta-3 focus:border-marca-500 focus:outline-none focus:ring-2 focus:ring-marca-500/25 disabled:bg-plano disabled:text-tinta-3';
+  'w-full rounded-xl border border-eje bg-white px-3.5 text-tinta placeholder:text-tinta-3 focus:border-marca-500 focus:outline-none focus:ring-2 focus:ring-marca-500/25 disabled:bg-plano disabled:text-tinta-3';
 
 export function Campo({
   etiqueta,
@@ -111,31 +97,24 @@ export function Campo({
 }
 
 export function Entrada({ className, ...resto }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx(ESTILO_ENTRADA, ancho(className), 'h-12', className)} {...resto} />;
+  return <input className={cx(ESTILO_ENTRADA, 'h-12', className)} {...resto} />;
 }
 
 export function AreaTexto({ className, ...resto }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cx(ESTILO_ENTRADA, 'w-full min-h-28 py-3 leading-snug', className)} {...resto} />;
+  return <textarea className={cx(ESTILO_ENTRADA, 'min-h-28 py-3 leading-snug', className)} {...resto} />;
 }
 
 export function Selector({ className, children, ...resto }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cx(ESTILO_ENTRADA, ancho(className), 'h-11 pr-8', className)} {...resto}>
+    <select className={cx(ESTILO_ENTRADA, 'h-11 pr-8', className)} {...resto}>
       {children}
     </select>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Contenedores y avisos
-// ---------------------------------------------------------------------------
-
 export function Tarjeta({ className, children, ...resto }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
-      className={cx('rounded-2xl border border-black/10 bg-superficie', className)}
-      {...resto}
-    >
+    <div className={cx('rounded-2xl border border-black/10 bg-superficie', className)} {...resto}>
       {children}
     </div>
   );
@@ -240,10 +219,6 @@ export function Vacio({ titulo, children }: { titulo: string; children?: React.R
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Ventana modal
-// ---------------------------------------------------------------------------
 
 export function Modal({
   abierto,

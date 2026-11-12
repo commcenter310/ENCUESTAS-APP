@@ -65,7 +65,7 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
   const [registro, setRegistro] = useState<Registro[]>(() => leerRegistro(uid));
   const [envio, setEnvio] = useState<EstadoEnvio | null>(null);
   const [enviando, setEnviando] = useState(false);
-  const [mensaje, setMensaje] = useState<string | null>(null);
+  const [mensaje, setMensaje] = useState<{ tono: 'bien' | 'grave'; texto: string } | null>(null);
   /** Confirmación para descartar la entrevista a medias (y, si aplica, abrir una nueva). */
   const [confirmar, setConfirmar] = useState<{ nueva: EncuestaDeCampo | null } | null>(null);
   const montado = useRef(true);
@@ -79,9 +79,7 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
 
   const cargarAvances = useCallback(
     async (lista: EncuestaDeCampo[]) => {
-      const pares = await Promise.all(
-        lista.map(async (e) => [e.id, await cargarAvance(uid, e.id)] as const),
-      );
+      const pares = await Promise.all(lista.map(async (e) => [e.id, await cargarAvance(uid, e.id)] as const));
       if (montado.current) setAvances(Object.fromEntries(pares));
     },
     [uid],
@@ -164,7 +162,10 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
       precision_m: null,
     };
     if (!guardarBorrador(uid, nuevo)) {
-      setMensaje('El dispositivo no tiene espacio para guardar la entrevista. Libera espacio e intenta de nuevo.');
+      setMensaje({
+        tono: 'grave',
+        texto: 'El dispositivo no tiene espacio para guardar la entrevista. Libera espacio e intenta de nuevo.',
+      });
       return;
     }
     setMensaje(null);
@@ -177,11 +178,11 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
     salirDeEntrevista();
     setEnEntrevista(false);
     leerLocal();
-    setMensaje(
-      resultado === 'completa'
-        ? 'Entrevista guardada.'
-        : 'Se registró que la persona no cumplía los requisitos.',
-    );
+    setMensaje({
+      tono: 'bien',
+      texto:
+        resultado === 'completa' ? 'Entrevista guardada.' : 'Se registró que la persona no cumplía los requisitos.',
+    });
     enviar();
   }
 
@@ -207,7 +208,6 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
 
   const encuestaDelBorrador = borrador ? encuestas.find((e) => e.id === borrador.encuesta_id) : undefined;
 
-  // --- Pantalla de captura -----------------------------------------------------
   if (enEntrevista && borrador && encuestaDelBorrador) {
     return (
       <Entrevista
@@ -256,11 +256,8 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
           </Link>
         )}
 
-        {mensaje && (
-          <Aviso tono={mensaje.startsWith('El dispositivo') ? 'grave' : 'bien'}>{mensaje}</Aviso>
-        )}
+        {mensaje && <Aviso tono={mensaje.tono}>{mensaje.texto}</Aviso>}
 
-        {/* Entrevista a medias */}
         {borrador && (
           <Tarjeta className="border-marca-300 bg-marca-50 p-4">
             <p className="font-semibold text-marca-900">Tienes una entrevista sin terminar</p>
@@ -283,7 +280,6 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
           </Tarjeta>
         )}
 
-        {/* Encuestas */}
         {cargando ? (
           <Cargando texto="Cargando encuestas…" />
         ) : encuestas.length === 0 ? (
@@ -311,9 +307,7 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
                   </div>
                   <div className="rounded-xl bg-plano px-3 py-2.5">
                     <dt className="text-sm text-tinta-2">En total</dt>
-                    <dd className="text-2xl font-semibold">
-                      {entero((avance?.efectivas ?? 0) + (local?.total ?? 0))}
-                    </dd>
+                    <dd className="text-2xl font-semibold">{entero((avance?.efectivas ?? 0) + (local?.total ?? 0))}</dd>
                   </div>
                 </dl>
                 <Boton
@@ -330,7 +324,6 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
           })
         )}
 
-        {/* Envío */}
         <Tarjeta className="p-4">
           <div className="flex items-start gap-3">
             {cola.length === 0 ? (
@@ -390,7 +383,6 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
           </div>
         </Tarjeta>
 
-        {/* Lo levantado en este dispositivo */}
         {registro.length > 0 && (
           <section aria-labelledby="titulo-recientes">
             <h2 id="titulo-recientes" className="mb-2 px-1 text-sm font-semibold text-tinta-2">
@@ -400,7 +392,8 @@ export function InicioEncuestador({ identidad }: { identidad: Identidad }) {
               {registro.slice(0, 15).map((r) => (
                 <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                   <span className="w-24 shrink-0 text-tinta-2 tabular-nums">
-                    {diaLocal(r.terminada_en) === hoy ? 'Hoy' : diaLocal(r.terminada_en).slice(5)} · {hora(r.terminada_en)}
+                    {diaLocal(r.terminada_en) === hoy ? 'Hoy' : diaLocal(r.terminada_en).slice(5)} ·{' '}
+                    {hora(r.terminada_en)}
                   </span>
                   <span className="min-w-0 flex-1 truncate">
                     {r.zona ? `Sección ${r.zona}` : 'Sin sección'}

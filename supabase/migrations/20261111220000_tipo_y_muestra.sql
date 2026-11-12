@@ -13,12 +13,10 @@
 -- -----------------------------------------------------------------------------
 -- Tipo de encuesta
 -- -----------------------------------------------------------------------------
-alter table public.encuestas add column tipo text
+-- Con valor por defecto: el código anterior (que no envía tipo) sigue
+-- funcionando si la migración se aplica antes de publicar el código nuevo.
+alter table public.encuestas add column tipo text not null default 'rigor_cientifico'
   check (tipo in ('rigor_cientifico', 'posicionamiento'));
-
-update public.encuestas set tipo = 'rigor_cientifico' where tipo is null;
-
-alter table public.encuestas alter column tipo set not null;
 
 comment on column public.encuestas.tipo is
   'rigor_cientifico: muestra probabilística con margen de error. posicionamiento: medición de imagen y posicionamiento.';
@@ -76,24 +74,28 @@ grant all on table public.secciones_muestra to service_role;
 -- Conteo por sección (todo el equipo)
 -- -----------------------------------------------------------------------------
 -- El encuestador solo ve sus propias entrevistas (RLS), pero para respetar el
--- tope necesita saber cuántas lleva todo el equipo en cada sección. Esta
--- función devuelve solo totales por sección: no expone respuestas ni nombres.
+-- tope necesita saber cuántas lleva todo el equipo en cada sección. Devuelve
+-- solo totales por sección ({"2136": 7, ...}): no expone respuestas ni nombres.
+-- Un solo jsonb, no filas, para que el límite de filas de la API no lo recorte.
 create function public.conteo_secciones(p_encuesta uuid)
-returns table (zona text, efectivas bigint)
+returns jsonb
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select e.zona, count(*) as efectivas
-  from public.entrevistas e
-  where e.encuesta_id = p_encuesta
-    and e.zona is not null
-    and e.resultado = 'completa'
-    and e.revision <> 'anulada'
-    and (select privado.esta_activo())
-    and privado.encuesta_recibe(p_encuesta)
-  group by e.zona;
+  select coalesce(jsonb_object_agg(c.zona, c.efectivas), '{}'::jsonb)
+  from (
+    select e.zona, count(*) as efectivas
+    from public.entrevistas e
+    where e.encuesta_id = p_encuesta
+      and e.zona is not null
+      and e.resultado = 'completa'
+      and e.revision <> 'anulada'
+    group by e.zona
+  ) c
+  where (select privado.es_admin())
+     or ((select privado.esta_activo()) and privado.encuesta_recibe(p_encuesta));
 $$;
 
 revoke all on function public.conteo_secciones(uuid) from public, anon;
@@ -113,7 +115,7 @@ begin
   if not (select privado.es_admin()) then
     raise exception 'Solo un administrador puede cargar la muestra' using errcode = '42501';
   end if;
-  if jsonb_typeof(p_secciones) <> 'array' then
+  if p_secciones is null or jsonb_typeof(p_secciones) <> 'array' then
     raise exception 'La muestra debe ser una lista de secciones' using errcode = '22023';
   end if;
 

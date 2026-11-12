@@ -1,7 +1,8 @@
-import { columnasDeRespuestas, etiquetaDe } from '@/lib/encuesta/motor';
-import type { Encuesta, Entrevista } from '@/lib/encuesta/tipos';
+import { columnasDeRespuestas, etiquetaDe } from '@/lib/encuesta/columnas';
+import { type Encuesta, type Entrevista, NOMBRES_RESULTADO, NOMBRES_REVISION } from '@/lib/encuesta/tipos';
 import { diaLocal, hora } from '@/lib/formato';
-import { type SeccionMuestra, ubicarSeccion } from '@/lib/muestra';
+import { COLUMNAS_CSV, type SeccionMuestra } from '@/lib/muestra';
+import { type FilaDeAvance, ubicarSeccion } from '@/lib/muestra-avance';
 
 type Celda = string | number | null | undefined;
 
@@ -32,12 +33,9 @@ export function descargar(nombre: string, contenido: string, tipo = 'text/csv;ch
 
 export type EntrevistaConNombre = Entrevista & { encuestador: { nombre: string } | null };
 
-const RESULTADOS = { completa: 'Completa', no_elegible: 'No elegible' } as const;
-const REVISIONES = { pendiente: 'Pendiente', validada: 'Validada', anulada: 'Anulada' } as const;
-
 /**
  * Una fila por entrevista y una columna por respuesta, con etiquetas legibles.
- * Con muestra cargada agrega los datos de la sección (distritos, estrato y factor).
+ * Los datos de la sección en la muestra van al final para no mover las columnas de siempre.
  */
 export function entrevistasACsv(
   encuesta: Encuesta,
@@ -61,14 +59,13 @@ export function entrevistasACsv(
     'latitud',
     'longitud',
     'precision_m',
-    'seccion',
+    ...columnas.map((c) => c.titulo),
     'distrito_local',
     'distrito_federal',
     'estrato',
     'factor_ponderacion',
     'en_muestra',
     'reemplazo_de',
-    ...columnas.map((c) => c.titulo),
   ];
   const filas = entrevistas.map((e) => {
     const ubicacion = ubicarSeccion(muestra, e.zona);
@@ -81,22 +78,38 @@ export function entrevistasACsv(
       e.duracion_seg,
       e.encuestador?.nombre ?? '',
       e.version,
-      RESULTADOS[e.resultado],
+      NOMBRES_RESULTADO[e.resultado],
       e.motivo_no_elegible,
-      REVISIONES[e.revision],
+      NOMBRES_REVISION[e.revision],
       e.nota_revision,
       e.lat,
       e.lng,
       e.precision_m,
-      e.zona,
+      ...columnas.map((c) => etiquetaDe(c, e.respuestas[c.clave])),
       fila?.distrito_local,
       fila?.distrito_federal,
       fila?.estrato,
       fila?.factor_ponderacion,
       muestra.length === 0 ? '' : fila ? 'Sí' : 'No',
       ubicacion.tipo === 'reemplazo' ? ubicacion.fila.seccion : '',
-      ...columnas.map((c) => etiquetaDe(c, e.respuestas[c.clave])),
     ];
   });
   return aCsv(encabezados, filas);
+}
+
+export function muestraACsv(filas: FilaDeAvance[]): string {
+  return aCsv(
+    [...COLUMNAS_CSV, 'LEVANTADAS'],
+    filas.map((f) => [
+      f.seccion,
+      f.distrito_local,
+      f.distrito_federal,
+      f.meta,
+      f.estrato,
+      f.lista_nominal,
+      f.factor_ponderacion,
+      f.reemplazo,
+      f.levantadas,
+    ]),
+  );
 }

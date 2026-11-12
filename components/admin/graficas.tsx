@@ -12,13 +12,9 @@
 import { useId, useState } from 'react';
 import { Table2 } from 'lucide-react';
 import { cx } from '@/components/ui';
-import type { FilaResultado } from '@/lib/encuesta/motor';
+import type { FilaResultado } from '@/lib/encuesta/reportes';
 import type { Opcion } from '@/lib/encuesta/tipos';
 import { diaCorto, diaLargo, entero, porcentaje } from '@/lib/formato';
-
-// ---------------------------------------------------------------------------
-// Colores
-// ---------------------------------------------------------------------------
 
 /** Paleta categórica validada (orden fijo; no se recicla ni se generan más). */
 const CATEGORICOS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
@@ -46,10 +42,6 @@ export function coloresDe(opciones: Opcion[]): Record<string, string> {
   return colores;
 }
 
-// ---------------------------------------------------------------------------
-// Cifras
-// ---------------------------------------------------------------------------
-
 /** Cifra principal con etiqueta: el formato de los indicadores del tablero. */
 export function Cifra({
   etiqueta,
@@ -65,7 +57,11 @@ export function Cifra({
   className?: string;
 }) {
   return (
-    <div role="group" aria-label={etiqueta} className={cx('rounded-2xl border border-black/10 bg-superficie p-4', className)}>
+    <div
+      role="group"
+      aria-label={etiqueta}
+      className={cx('rounded-2xl border border-black/10 bg-superficie p-4', className)}
+    >
       <p className="text-sm text-tinta-2">{etiqueta}</p>
       <p className="mt-1 text-3xl leading-none font-semibold tracking-tight">{valor}</p>
       {detalle && <p className="mt-1.5 text-sm text-tinta-2">{detalle}</p>}
@@ -91,10 +87,6 @@ export function Medidor({ valor, meta, etiqueta }: { valor: number; meta: number
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Lista de barras (una serie): nombre, barra y cifra por renglón
-// ---------------------------------------------------------------------------
 
 export function ListaDeBarras({
   filas,
@@ -171,10 +163,6 @@ function Flotante({ children, arriba = false }: { children: React.ReactNode; arr
   );
 }
 
-// ---------------------------------------------------------------------------
-// Barra segmentada delgada (un todo repartido), junto a sus cifras
-// ---------------------------------------------------------------------------
-
 export type Segmento = { valor: string; etiqueta: string; n: number; color: string };
 
 export function BarraSegmentada({ segmentos, titulo }: { segmentos: Segmento[]; titulo: string }) {
@@ -183,7 +171,11 @@ export function BarraSegmentada({ segmentos, titulo }: { segmentos: Segmento[]; 
     .map((s) => `${s.etiqueta} ${porcentaje(total ? (s.n / total) * 100 : 0, 0)}`)
     .join(', ');
   return (
-    <div role="img" aria-label={`${titulo}: ${total ? descripcion : 'sin respuestas'}`} className="flex h-2 w-full gap-0.5">
+    <div
+      role="img"
+      aria-label={`${titulo}: ${total ? descripcion : 'sin respuestas'}`}
+      className="flex h-2 w-full gap-0.5"
+    >
       {total === 0 ? (
         <span className="h-full w-full rounded-full bg-linea" />
       ) : (
@@ -215,10 +207,6 @@ export function Leyenda({ elementos }: { elementos: { etiqueta: string; color: s
   );
 }
 
-// ---------------------------------------------------------------------------
-// Columnas por día (una serie en el tiempo)
-// ---------------------------------------------------------------------------
-
 function pasoBonito(maximo: number): number {
   const objetivo = Math.max(1, maximo) / 4;
   const potencia = 10 ** Math.floor(Math.log10(objetivo));
@@ -242,7 +230,13 @@ function completarDias(datos: { dia: string; n: number }[], maxDias: number): { 
   return salida;
 }
 
-export function ColumnasPorDia({ datos, unidad = 'entrevistas' }: { datos: { dia: string; n: number }[]; unidad?: string }) {
+export function ColumnasPorDia({
+  datos,
+  unidad = 'entrevistas',
+}: {
+  datos: { dia: string; n: number }[];
+  unidad?: string;
+}) {
   const [tabla, setTabla] = useState(false);
   const idTitulo = useId();
   const dias = completarDias(datos, 31);
@@ -297,7 +291,6 @@ export function ColumnasPorDia({ datos, unidad = 'entrevistas' }: { datos: { dia
         </div>
       ) : (
         <div className="flex gap-2" aria-labelledby={idTitulo} role="group">
-          {/* Eje vertical */}
           <div className="relative h-44 w-8 shrink-0 text-xs text-tinta-3 tabular-nums" aria-hidden>
             {marcas.map((m) => (
               <span
@@ -350,7 +343,6 @@ export function ColumnasPorDia({ datos, unidad = 'entrevistas' }: { datos: { dia
                 ))}
               </div>
             </div>
-            {/* Eje horizontal */}
             <div className="mt-1.5 flex justify-around gap-0.5 text-xs text-tinta-3" aria-hidden>
               {dias.map((d, i) => (
                 <span key={d.dia} className="min-w-0 flex-1 text-center whitespace-nowrap">
@@ -364,10 +356,6 @@ export function ColumnasPorDia({ datos, unidad = 'entrevistas' }: { datos: { dia
     </figure>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Columnas chicas para una escala (1 a 10)
-// ---------------------------------------------------------------------------
 
 export function ColumnasDeEscala({ filas, titulo }: { filas: FilaResultado[]; titulo: string }) {
   const numericas = filas.filter((f) => !f.nsnc);

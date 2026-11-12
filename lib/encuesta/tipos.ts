@@ -7,7 +7,7 @@
  *
  * Las respuestas de una entrevista se guardan "aplanadas": un objeto
  * { clave: valor } donde la clave identifica la pregunta (o la fila de una
- * matriz) y el valor es texto o número. Ver `clavesDePregunta` en motor.ts.
+ * matriz) y el valor es texto o número. Ver `columnasDePregunta` en columnas.ts.
  */
 
 /** Valor que se guarda para una clave de respuesta. */
@@ -72,7 +72,6 @@ type PreguntaBase = {
   terminar?: ReglaTerminar[];
 };
 
-/** Opción única. */
 export type PreguntaUnica = PreguntaBase & {
   tipo: 'unica';
   opciones: RefOpciones;
@@ -89,7 +88,6 @@ export type PreguntaUnica = PreguntaBase & {
   derivarDe?: { pregunta: string; rangos: { hasta: number; valor: string }[] };
 };
 
-/** Respuesta abierta (texto). */
 export type PreguntaAbierta = PreguntaBase & {
   tipo: 'abierta';
   multilinea?: boolean;
@@ -98,7 +96,6 @@ export type PreguntaAbierta = PreguntaBase & {
   marcador?: string;
 };
 
-/** Número entero. */
 export type PreguntaNumero = PreguntaBase & {
   tipo: 'numero';
   min?: number;
@@ -256,6 +253,32 @@ export type Encuesta = {
 
 export type ResultadoEntrevista = 'completa' | 'no_elegible';
 export type EstadoRevision = 'pendiente' | 'validada' | 'anulada';
+
+export const NOMBRES_RESULTADO: Record<ResultadoEntrevista, string> = {
+  completa: 'Completa',
+  no_elegible: 'No elegible',
+};
+export const NOMBRES_REVISION: Record<EstadoRevision, string> = {
+  pendiente: 'Pendiente',
+  validada: 'Validada',
+  anulada: 'Anulada',
+};
+
+export type EstadoEncuesta = Encuesta['estado'];
+export const ESTADOS_ENCUESTA: {
+  valor: EstadoEncuesta;
+  nombre: string;
+  ayuda: string;
+  tono: 'bien' | 'neutro' | 'aviso';
+}[] = [
+  { valor: 'borrador', nombre: 'Borrador', ayuda: 'Solo la ve el administrador.', tono: 'aviso' },
+  { valor: 'activa', nombre: 'Activa', ayuda: 'Los encuestadores pueden levantarla.', tono: 'bien' },
+  { valor: 'cerrada', nombre: 'Cerrada', ayuda: 'Ya no se inician entrevistas nuevas.', tono: 'neutro' },
+];
+
+export function estadoDeEncuesta(estado: EstadoEncuesta) {
+  return ESTADOS_ENCUESTA.find((e) => e.valor === estado) ?? ESTADOS_ENCUESTA[0];
+}
 
 /** Entrevista tal como se envía desde el dispositivo. */
 export type EntrevistaNueva = {

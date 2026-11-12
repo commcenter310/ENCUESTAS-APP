@@ -13,8 +13,9 @@ Hecha con Next.js (Vercel) y Supabase (base de datos, cuentas y una Edge Functio
 |---|---|
 | `app/` | Pantallas: `login`, `instalar`, `encuestador`, `admin/*` |
 | `components/` | Piezas de interfaz (`campo/` captura, `admin/` panel) |
-| `lib/encuesta/` | Motor de encuestas: formato (`tipos.ts`), lógica (`motor.ts`) y pruebas |
-| `lib/campo.ts` | Borrador, cola sin conexión y sincronización |
+| `lib/encuesta/` | Motor de encuestas: formato (`tipos.ts`), captura (`motor.ts`), opciones y rotación (`opciones.ts`), claves de respuesta (`columnas.ts`), resultados (`reportes.ts`), revisión de cuestionarios (`revisar.ts`) y pruebas |
+| `lib/campo.ts` | Borrador, cola sin conexión, sincronización y guardado de entrevistas |
+| `lib/muestra.ts`, `muestra-avance.ts`, `muestra-datos.ts` | Lectura del archivo de muestra, avance contra los topes y lectura desde Supabase |
 | `encuestas/` | Cuestionarios en JSON (ej. `guasave-ims.json`) |
 | `supabase/migrations/` | Tablas, seguridad (RLS) y funciones de monitoreo |
 | `supabase/functions/usuarios/` | Alta y administración de cuentas (usa la llave secreta, que nunca sale de Supabase) |
@@ -26,6 +27,12 @@ Hecha con Next.js (Vercel) y Supabase (base de datos, cuentas y una Edge Functio
 ## Variables
 
 Ver `.env.example`. En Vercel se configuran las mismas dos variables.
+
+## Convenciones
+
+- Ningún archivo de código pasa de 1,000 líneas; si crece, se divide por responsabilidad.
+- Comentarios solo para lo que el código no dice: el porqué, decisiones de seguridad e invariantes.
+- `npm test`, `npx tsc --noEmit` y `npx eslint .` deben pasar antes de subir cambios.
 
 ## Desarrollo local
 

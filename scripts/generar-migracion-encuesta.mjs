@@ -10,14 +10,16 @@
  *   node scripts/generar-migracion-encuesta.mjs encuestas/guasave-ims.json guasave-2026 "Encuesta Municipal Guasave" 1000
  *
  * Para encuestas nuevas normalmente no hace falta: el administrador puede
- * importar el JSON desde la app (Encuestas → Importar).
+ * crearla desde la app (Encuestas → Nueva encuesta).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
 const [archivo, clave, titulo, meta, descripcion] = process.argv.slice(2);
 if (!archivo || !clave || !titulo) {
-  console.error('Uso: node scripts/generar-migracion-encuesta.mjs <archivo.json> <clave> "<título>" [meta] ["descripción"]');
+  console.error(
+    'Uso: node scripts/generar-migracion-encuesta.mjs <archivo.json> <clave> "<título>" [meta] ["descripción"]',
+  );
   process.exit(1);
 }
 

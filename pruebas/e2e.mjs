@@ -47,10 +47,6 @@ async function captura(pagina, nombre) {
   await pagina.screenshot({ path: `${CAPTURAS}${nombre}.png`, fullPage: true });
 }
 
-// ---------------------------------------------------------------------------
-// Ayudantes de la entrevista
-// ---------------------------------------------------------------------------
-
 /** Texto del encabezado: identifica en qué pantalla está la entrevista. */
 async function encabezado(pagina) {
   return (await pagina.locator('header').filter({ visible: true }).first().innerText()).replace(/\s+/g, ' ').trim();
@@ -83,7 +79,10 @@ async function responderPantalla(pagina, elegir = () => 0) {
     await pagina.waitForTimeout(320);
     if ((await encabezado(pagina)) !== antes) return true; // avanzó sola
   }
-  for (const campo of await pagina.locator('main input:not([type="checkbox"]), main textarea').filter({ visible: true }).all()) {
+  for (const campo of await pagina
+    .locator('main input:not([type="checkbox"]), main textarea')
+    .filter({ visible: true })
+    .all()) {
     if ((await campo.inputValue()) !== '') continue;
     const numerico = (await campo.getAttribute('inputmode')) === 'numeric';
     await campo.fill(numerico ? '35' : 'Respuesta de prueba');
@@ -106,9 +105,12 @@ async function recorrerCuestionario(pagina, elegir) {
     await pagina
       .waitForFunction(
         (texto) => {
-          const visibles = (selector) => [...document.querySelectorAll(selector)].filter((e) => e.offsetParent !== null);
+          const visibles = (selector) =>
+            [...document.querySelectorAll(selector)].filter((e) => e.offsetParent !== null);
           const cabecera = visibles('header')[0];
-          return cabecera?.innerText.replace(/\s+/g, ' ').trim() !== texto || visibles('main [role="alert"]').length > 0;
+          return (
+            cabecera?.innerText.replace(/\s+/g, ' ').trim() !== texto || visibles('main [role="alert"]').length > 0
+          );
         },
         antes,
         { timeout: 5000 },
@@ -143,17 +145,15 @@ async function entrar(pagina, usuario) {
   await pagina.getByRole('button', { name: 'Entrar' }).click();
 }
 
-// ---------------------------------------------------------------------------
-// Recorrido
-// ---------------------------------------------------------------------------
-
 const navegador = await chromium.launch();
 const errores = [];
 
 /** Candado: si la app compilada apunta a un Supabase en internet, la prueba se detiene. */
 async function soloLocal(contexto) {
   await contexto.route(/^https:\/\/[^/]*supabase\.(co|com)\//, (ruta) => {
-    errores.push(`La app intentó usar un Supabase en internet (${new URL(ruta.request().url()).host}). Compila con el Supabase local.`);
+    errores.push(
+      `La app intentó usar un Supabase en internet (${new URL(ruta.request().url()).host}). Compila con el Supabase local.`,
+    );
     return ruta.abort();
   });
 }
@@ -231,7 +231,10 @@ try {
   ok('no deja comenzar sin la sección');
   await campo.getByRole('textbox', { name: 'Sección electoral' }).fill('1450');
   await campo.getByRole('button', { name: 'Comenzar' }).click();
-  await textoEn(campo, `Mi nombre es ${process.env.E2E_SOLO_CAMPO === '1' ? ADMIN.nombre : ENCUESTADOR.nombre}`).waitFor();
+  await textoEn(
+    campo,
+    `Mi nombre es ${process.env.E2E_SOLO_CAMPO === '1' ? ADMIN.nombre : ENCUESTADOR.nombre}`,
+  ).waitFor();
   ok('la introducción lleva el nombre del encuestador');
   await captura(campo, '04-introduccion');
   await campo.getByRole('button', { name: 'Iniciar preguntas' }).click();
@@ -251,12 +254,21 @@ try {
     return 0;
   });
   afirmar(vistas.length >= 28, `recorre las ${vistas.length} pantallas del cuestionario`);
-  afirmar(elegidaP18 && opcionesP19 && !opcionesP19.includes(elegidaP18), 'la 19 no ofrece a quien ya se eligió en la 18');
-  afirmar(!vistas.some((v) => v.includes('sociodemográficos') && /^S1\b/.test(v)), 'S1 (grupo de edad) no se pregunta: se calcula');
+  afirmar(
+    elegidaP18 && opcionesP19 && !opcionesP19.includes(elegidaP18),
+    'la 19 no ofrece a quien ya se eligió en la 18',
+  );
+  afirmar(
+    !vistas.some((v) => v.includes('sociodemográficos') && /^S1\b/.test(v)),
+    'S1 (grupo de edad) no se pregunta: se calcula',
+  );
   await captura(campo, '05-cierre');
   await textoEn(campo, 'Ubicación registrada').waitFor({ timeout: 20000 });
   ok('registra la ubicación GPS');
-  afirmar(await campo.getByRole('button', { name: 'Guardar entrevista' }).isDisabled(), 'no deja guardar sin aceptar la declaración');
+  afirmar(
+    await campo.getByRole('button', { name: 'Guardar entrevista' }).isDisabled(),
+    'no deja guardar sin aceptar la declaración',
+  );
   await guardarEntrevista(campo);
   await textoEn(campo, 'Todo está enviado').waitFor({ timeout: 15000 });
   ok('guarda y envía la entrevista');
@@ -265,7 +277,10 @@ try {
   await campo.getByRole('button', { name: 'Nueva entrevista' }).first().click();
   await textoEn(campo, 'Cuestionario versión B').waitFor();
   ok('la segunda entrevista usa la versión B (rotación)');
-  afirmar((await campo.getByRole('textbox', { name: 'Sección electoral' }).inputValue()) === '1450', 'recuerda la sección anterior');
+  afirmar(
+    (await campo.getByRole('textbox', { name: 'Sección electoral' }).inputValue()) === '1450',
+    'recuerda la sección anterior',
+  );
   await textoEn(campo, 'Llevas 1 de 10 entrevistas en sección 1450').waitFor({ timeout: 10000 });
   ok('muestra el avance en la sección');
   await campo.getByRole('button', { name: 'Comenzar' }).click();
@@ -320,7 +335,9 @@ try {
   await captura(campo, '08-encuestador-final');
 
   if (process.env.E2E_SOLO_CAMPO !== '1') {
-    await import('./e2e-admin.mjs').then((m) => m.probarPanel({ admin, campo, celular, ok, afirmar, captura, BASE, ADMIN, ENCUESTADOR }));
+    await import('./e2e-admin.mjs').then((m) =>
+      m.probarPanel({ admin, campo, celular, ok, afirmar, captura, BASE, ADMIN, ENCUESTADOR }),
+    );
   }
 
   if (errores.length > 0) throw new Error(`Errores de JavaScript en la página:\n${errores.join('\n')}`);
@@ -329,7 +346,9 @@ try {
   console.error(`\n✗ ${e.message}\n`);
   for (const contexto of navegador.contexts()) {
     for (const [i, pagina] of contexto.pages().entries()) {
-      await pagina.screenshot({ path: `${CAPTURAS}fallo-${i}-${Date.now()}.png`, fullPage: true }).catch(() => undefined);
+      await pagina
+        .screenshot({ path: `${CAPTURAS}fallo-${i}-${Date.now()}.png`, fullPage: true })
+        .catch(() => undefined);
       console.error(`   página abierta: ${pagina.url()}`);
     }
   }

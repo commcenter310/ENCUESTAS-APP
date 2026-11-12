@@ -7,11 +7,13 @@ import { BotonActualizar, ConEncuesta, Encabezado, EstadoDeConsulta, TituloDeBlo
 import { exigir, useConsulta } from '@/components/admin/contexto';
 import { Cifra, ColumnasPorDia, ListaDeBarras, Medidor } from '@/components/admin/graficas';
 import { Aviso, Insignia, Tarjeta, Vacio, cx } from '@/components/ui';
-import { columnasDeRespuestas, resumirConteo, type Conteo } from '@/lib/encuesta/motor';
+import { columnasDeRespuestas } from '@/lib/encuesta/columnas';
+import { resumirConteo, type Conteo } from '@/lib/encuesta/reportes';
 import type { Encuesta } from '@/lib/encuesta/tipos';
 import { duracion, entero, haceCuanto, porcentaje } from '@/lib/formato';
-import { leerMuestra } from '@/lib/campo';
-import { levantadasEn } from '@/lib/muestra';
+import { etiquetasZona } from '@/lib/encuesta/monitoreo';
+import { avanceDeMuestra } from '@/lib/muestra-avance';
+import { leerMuestra } from '@/lib/muestra-datos';
 import { supabase } from '@/lib/supabase';
 
 type Totales = {
@@ -78,33 +80,16 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
 
   const meta = encuesta.meta_muestra;
   const metaZona = def.monitoreo?.metaPorZona ?? null;
-  const etiquetaZona = def.monitoreo?.etiquetaZona ?? 'Zona';
+  const { singular: etiquetaZona, plural: etiquetaZonas } = etiquetasZona(def);
   const minimo = def.monitoreo?.duracionMinimaSeg ?? 0;
   const columnas = useMemo(() => columnasDeRespuestas(def), [def]);
 
-  // Con muestra cargada, el avance por sección se mide contra el tope de cada una.
+  // Con muestra cargada, el avance se mide contra el tope de cada sección.
   const avanceMuestra = useMemo(() => {
     if (!datos || datos.muestra.length === 0) return null;
-    const conteo = Object.fromEntries(datos.tablero.por_zona.map((z) => [z.zona, z.n]));
-    const filas = datos.muestra
-      .map((s) => ({ ...s, n: levantadasEn(s, conteo) }))
-      .sort((a, b) => Number(a.seccion) - Number(b.seccion));
-    const enMuestra = new Set(datos.muestra.flatMap((s) => [s.seccion, s.reemplazo].filter(Boolean)));
-    const porDl = new Map<string, { meta: number; n: number }>();
-    for (const f of filas) {
-      const clave = f.distrito_local === null ? 'Sin dato' : `DL ${f.distrito_local}`;
-      const g = porDl.get(clave) ?? { meta: 0, n: 0 };
-      g.meta += f.meta;
-      g.n += Math.min(f.n, f.meta);
-      porDl.set(clave, g);
-    }
-    return {
-      filas,
-      completas: filas.filter((f) => f.n >= f.meta).length,
-      fuera: datos.tablero.por_zona.filter((z) => z.zona && !enMuestra.has(z.zona)).reduce((s, z) => s + z.n, 0),
-      porDl: [...porDl.entries()],
-    };
+    return avanceDeMuestra(datos.muestra, Object.fromEntries(datos.tablero.por_zona.map((z) => [z.zona, z.n])));
   }, [datos]);
+  const enFuera = avanceMuestra?.fuera.reduce((s, [, n]) => s + n, 0) ?? 0;
 
   return (
     <>
@@ -125,7 +110,6 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
         <div className={cx('flex flex-col gap-4 transition-opacity', actualizando && 'opacity-60')}>
           {error && <Aviso tono="aviso">{error} Se muestran los últimos datos cargados.</Aviso>}
 
-          {/* Indicadores */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Cifra
               className="col-span-2"
@@ -184,13 +168,13 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
             />
             {avanceMuestra ? (
               <Cifra
-                etiqueta={`${etiquetaZona === 'Sección' ? 'Secciones' : 'Zonas'} completas`}
+                etiqueta={`${etiquetaZonas} completas`}
                 valor={entero(avanceMuestra.completas)}
-                detalle={`de ${entero(avanceMuestra.filas.length)} en la muestra${avanceMuestra.fuera ? ` · ${entero(avanceMuestra.fuera)} fuera de muestra` : ''}`}
+                detalle={`de ${entero(avanceMuestra.filas.length)} en la muestra${enFuera ? ` · ${entero(enFuera)} fuera de muestra` : ''}`}
               />
             ) : (
               <Cifra
-                etiqueta={`${etiquetaZona === 'Sección' ? 'Secciones' : 'Zonas'} con avance`}
+                etiqueta={`${etiquetaZonas} con avance`}
                 valor={entero(datos.tablero.totales.zonas)}
                 detalle={metaZona ? `Meta: ${metaZona} por ${etiquetaZona.toLowerCase()}` : undefined}
               />
@@ -202,7 +186,6 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
               <ColumnasPorDia datos={datos.tablero.por_dia} />
             </Tarjeta>
 
-            {/* Perfil de la muestra */}
             <Tarjeta className="p-5 lg:col-span-2">
               <TituloDeBloque detalle="% de entrevistas efectivas">Perfil de la muestra</TituloDeBloque>
               {clavesPerfil.length === 0 || datos.tablero.totales.efectivas === 0 ? (
@@ -220,7 +203,6 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
             </Tarjeta>
           </div>
 
-          {/* Encuestadores */}
           <Tarjeta className="overflow-hidden">
             <div className="px-5 pt-5">
               <TituloDeBloque detalle="Ordenados por entrevistas efectivas">Encuestadores</TituloDeBloque>
@@ -277,7 +259,6 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
             )}
           </Tarjeta>
 
-          {/* Avance por zona, contra la muestra */}
           {avanceMuestra && (
             <Tarjeta className="p-5">
               <TituloDeBloque
@@ -290,17 +271,20 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
                 Avance de la muestra por {etiquetaZona.toLowerCase()}
               </TituloDeBloque>
               <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {avanceMuestra.porDl.map(([nombre, g]) => (
-                  <div key={nombre} className="text-sm">
-                    <div className="mb-1 flex items-baseline justify-between gap-2">
-                      <span className="font-semibold">{nombre}</span>
-                      <span className="text-tinta-2 tabular-nums">
-                        {entero(g.n)} / {entero(g.meta)}
-                      </span>
+                {avanceMuestra.porDistritoLocal.map((g) => {
+                  const nombre = g.distrito === null ? 'Sin dato' : `DL ${g.distrito}`;
+                  return (
+                    <div key={nombre} className="text-sm">
+                      <div className="mb-1 flex items-baseline justify-between gap-2">
+                        <span className="font-semibold">{nombre}</span>
+                        <span className="text-tinta-2 tabular-nums">
+                          {entero(g.utiles)} / {entero(g.meta)}
+                        </span>
+                      </div>
+                      <Medidor valor={g.utiles} meta={g.meta} etiqueta={nombre} />
                     </div>
-                    <Medidor valor={g.n} meta={g.meta} etiqueta={nombre} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <ul className="grid grid-cols-3 gap-x-5 gap-y-2.5 sm:grid-cols-5 lg:grid-cols-8">
                 {avanceMuestra.filas.map((f) => (
@@ -308,19 +292,21 @@ function TableroDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
                     <div className="mb-0.5 flex items-baseline justify-between gap-1">
                       <span className="font-medium">{f.seccion}</span>
                       <span
-                        className={cx('tabular-nums', f.n > f.meta ? 'font-semibold text-aviso-texto' : 'text-tinta-2')}
+                        className={cx(
+                          'tabular-nums',
+                          f.estado === 'excedida' ? 'font-semibold text-aviso-texto' : 'text-tinta-2',
+                        )}
                       >
-                        {f.n}/{f.meta}
+                        {f.levantadas}/{f.meta}
                       </span>
                     </div>
-                    <Medidor valor={f.n} meta={f.meta} etiqueta={`${etiquetaZona} ${f.seccion}`} />
+                    <Medidor valor={f.levantadas} meta={f.meta} etiqueta={`${etiquetaZona} ${f.seccion}`} />
                   </li>
                 ))}
               </ul>
             </Tarjeta>
           )}
 
-          {/* Avance por zona (sin muestra) */}
           {!avanceMuestra && (
             <Tarjeta className="p-5">
               <TituloDeBloque

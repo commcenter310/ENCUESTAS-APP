@@ -7,41 +7,21 @@
  */
 import { borrar, guardar, leer } from '@/lib/almacen';
 import { esErrorDeRed, supabase } from '@/lib/supabase';
+import { limpiarRespuestas, validarPregunta } from '@/lib/encuesta/motor';
+import { etiquetasZona, zonaDe } from '@/lib/encuesta/monitoreo';
 import type { Encuesta, EntrevistaNueva, Respuestas, ResultadoEntrevista } from '@/lib/encuesta/tipos';
 import type { SeccionMuestra } from '@/lib/muestra';
-
-// ---------------------------------------------------------------------------
-// Encuestas disponibles (con copia local para trabajar sin señal)
-// ---------------------------------------------------------------------------
+import { type Conteo, autollenarDistritos, revisarSeccion, sumarConteos } from '@/lib/muestra-avance';
+import { leerConteoSecciones, leerMuestra } from '@/lib/muestra-datos';
 
 const CAMPOS_ENCUESTA =
   'id, clave, titulo, tipo, descripcion, definicion, estado, meta_muestra, zona_horaria, creada_en, actualizada_en';
-
-export const CAMPOS_MUESTRA =
-  'seccion, distrito_local, distrito_federal, meta, estrato, lista_nominal, factor_ponderacion, reemplazo';
 
 /** Encuesta tal como la usa el encuestador: con su muestra (vacía si no tiene). */
 export type EncuestaDeCampo = Encuesta & { muestra: SeccionMuestra[] };
 
 export function encuestasEnCache(uid: string): EncuestaDeCampo[] {
   return (leer<EncuestaDeCampo[]>(`encuestas:${uid}`) ?? []).map((e) => ({ ...e, muestra: e.muestra ?? [] }));
-}
-
-/** Lee la muestra completa de una encuesta (por páginas: la API entrega 1,000 filas a la vez). */
-export async function leerMuestra(encuestaId: string): Promise<SeccionMuestra[]> {
-  const filas: SeccionMuestra[] = [];
-  for (let desde = 0; ; desde += 1000) {
-    const { data, error } = await supabase()
-      .from('secciones_muestra')
-      .select(CAMPOS_MUESTRA)
-      .eq('encuesta_id', encuestaId)
-      .order('seccion')
-      .range(desde, desde + 999);
-    if (error) throw error;
-    const lote = (data ?? []).map((f) => ({ ...f, factor_ponderacion: f.factor_ponderacion === null ? null : Number(f.factor_ponderacion) })) as SeccionMuestra[];
-    filas.push(...lote);
-    if (lote.length < 1000) return filas;
-  }
 }
 
 /** Descarga las encuestas activas con su muestra. Sin conexión devuelve la copia local. */
@@ -63,10 +43,6 @@ export async function cargarEncuestas(uid: string): Promise<{ encuestas: Encuest
   }
 }
 
-// ---------------------------------------------------------------------------
-// Entrevista en curso
-// ---------------------------------------------------------------------------
-
 export type Borrador = {
   id: string;
   encuesta_id: string;
@@ -78,6 +54,8 @@ export type Borrador = {
   lat: number | null;
   lng: number | null;
   precision_m: number | null;
+  /** Respuestas que se llenaron solas con la muestra (para poder corregirlas). */
+  autollenado?: Respuestas;
 };
 
 export function leerBorrador(uid: string): Borrador | null {
@@ -122,9 +100,98 @@ export function nuevoId(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Cola de envío y registro local
-// ---------------------------------------------------------------------------
+/**
+ * Revisa los datos de arranque antes de empezar: preguntas de arranque y, con
+ * muestra cargada, que la sección esté en ella y no haya llegado a su tope.
+ */
+export function revisarArranque(
+  encuesta: EncuestaDeCampo,
+  borrador: Borrador,
+  equipo: Conteo,
+  propias: Conteo,
+): { error: string } | { respuestas: Respuestas; autollenado: Respuestas } {
+  const def = encuesta.definicion;
+  for (const p of def.arranque ?? []) {
+    const falta = validarPregunta(def, p, borrador.version, borrador.respuestas);
+    if (falta) return { error: `${p.texto}: ${falta}` };
+  }
+  const revision = revisarSeccion(encuesta.muestra, zonaDe(def, borrador.respuestas), equipo, propias);
+  if (!revision) return { respuestas: borrador.respuestas, autollenado: {} };
+  const etiqueta = etiquetasZona(def).singular.toLowerCase();
+  if (revision.ubicacion.tipo === 'fuera') {
+    return {
+      error: `La ${etiqueta} ${revision.seccion} no está en la muestra de esta encuesta. Revisa el número o elige una de la lista.`,
+    };
+  }
+  const fila = revision.ubicacion.fila;
+  if (revision.llena) {
+    return {
+      error: `La ${etiqueta} ${fila.seccion} ya completó su tope (${revision.levantadas} de ${fila.meta} entrevistas). Elige otra de la muestra.`,
+    };
+  }
+  return autollenarDistritos(def, fila, borrador.respuestas, borrador.autollenado);
+}
+
+/** Conteos para revisar topes: equipo (servidor) y propias, más lo pendiente en este teléfono. */
+export function conteosDeCampo(avance: AvancePropio | null, pendientes: Conteo): { equipo: Conteo; propias: Conteo } {
+  return {
+    equipo: sumarConteos(avance?.equipoPorZona ?? {}, pendientes),
+    propias: sumarConteos(avance?.propiasPorZona ?? {}, pendientes),
+  };
+}
+
+export function armarEntrevista(
+  encuesta: Encuesta,
+  encuestadorId: string,
+  b: Borrador,
+  resultado: ResultadoEntrevista,
+  motivo: string | null,
+): EntrevistaNueva {
+  const ahora = new Date().toISOString();
+  return {
+    id: b.id,
+    encuesta_id: encuesta.id,
+    encuestador_id: encuestadorId,
+    version: b.version,
+    resultado,
+    motivo_no_elegible: motivo,
+    respuestas: limpiarRespuestas(encuesta.definicion, b.version, b.respuestas),
+    iniciada_en: b.iniciada_en ?? ahora,
+    terminada_en: ahora,
+    lat: b.lat,
+    lng: b.lng,
+    precision_m: b.precision_m,
+    dispositivo: typeof navigator === 'undefined' ? null : navigator.userAgent.slice(0, 400),
+  };
+}
+
+/**
+ * Deja la entrevista a salvo: en la cola del teléfono o, si el teléfono no
+ * pudo guardarla, enviada directo. Al terminar borra el borrador y recuerda
+ * los datos de arranque. Devuelve false si no quedó guardada en ningún lado.
+ */
+export async function guardarEntrevistaTerminada(
+  uid: string,
+  encuesta: Encuesta,
+  entrevista: EntrevistaNueva,
+): Promise<boolean> {
+  const def = encuesta.definicion;
+  let guardada = encolar(uid, entrevista, zonaDe(def, entrevista.respuestas));
+  if (!guardada) {
+    const { error } = await supabase()
+      .from('entrevistas')
+      .upsert(entrevista, { onConflict: 'id', ignoreDuplicates: true });
+    guardada = !error;
+  }
+  if (!guardada) return false;
+  const arranque: Respuestas = {};
+  for (const p of def.arranque ?? []) {
+    if (entrevista.respuestas[p.id] !== undefined) arranque[p.id] = entrevista.respuestas[p.id];
+  }
+  guardarArranque(uid, encuesta.id, arranque);
+  borrarBorrador(uid);
+  return true;
+}
 
 export type Pendiente = EntrevistaNueva & {
   /** Motivo del último rechazo del servidor, si lo hubo. */
@@ -166,7 +233,10 @@ export function encolar(uid: string, entrevista: EntrevistaNueva, zona: string |
     resultado: entrevista.resultado,
     enviada: false,
   };
-  guardar(`registro:${uid}`, [registro, ...leerRegistro(uid).filter((r) => r.id !== registro.id)].slice(0, MAX_REGISTRO));
+  guardar(
+    `registro:${uid}`,
+    [registro, ...leerRegistro(uid).filter((r) => r.id !== registro.id)].slice(0, MAX_REGISTRO),
+  );
   return true;
 }
 
@@ -249,51 +319,51 @@ async function enviarPendientes(uid: string): Promise<ResultadoEnvio> {
   return fin(rechazadas > 0 ? 'rechazadas' : 'al_dia', enviadas);
 }
 
-// ---------------------------------------------------------------------------
-// Avance propio (lo que el servidor ya tiene de este encuestador)
-// ---------------------------------------------------------------------------
-
 export type AvancePropio = {
   efectivas: number;
   hoy: number;
-  /** Entrevistas propias por sección. */
-  porZona: Record<string, number>;
-  /** Entrevistas de todo el equipo por sección (para respetar los topes). */
-  equipo: Record<string, number>;
+  propiasPorZona: Conteo;
+  /** Todo el equipo: con esto se respetan los topes de la muestra. */
+  equipoPorZona: Conteo;
   consultado_en: string;
 };
 
 export function avanceEnCache(uid: string, encuestaId: string): AvancePropio | null {
-  return leer<AvancePropio>(`avance:${uid}:${encuestaId}`);
+  const guardado = leer<AvancePropio & { porZona?: Conteo; equipo?: Conteo }>(`avance:${uid}:${encuestaId}`);
+  if (!guardado) return null;
+  // Copias guardadas por la versión anterior de la app.
+  return {
+    ...guardado,
+    propiasPorZona: guardado.propiasPorZona ?? guardado.porZona ?? {},
+    equipoPorZona: guardado.equipoPorZona ?? guardado.equipo ?? {},
+  };
 }
 
-/** Pide al servidor el avance del encuestador (RLS lo limita a lo suyo). */
+/** Avance propio (RLS lo limita a lo suyo) y conteo del equipo por sección. */
 export async function cargarAvance(uid: string, encuestaId: string): Promise<AvancePropio | null> {
-  const [{ data, error }, conteo] = await Promise.all([
-    supabase().rpc('tablero_encuesta', { p_encuesta: encuestaId }),
-    supabase().rpc('conteo_secciones', { p_encuesta: encuestaId }),
-  ]);
-  if (error || !data || conteo.error) return avanceEnCache(uid, encuestaId);
-  const tablero = data as {
-    totales: { efectivas: number; hoy: number };
-    por_zona: { zona: string; n: number }[];
-  };
-  const avance: AvancePropio = {
-    efectivas: tablero.totales.efectivas ?? 0,
-    hoy: tablero.totales.hoy ?? 0,
-    porZona: Object.fromEntries(tablero.por_zona.map((z) => [z.zona, z.n])),
-    equipo: Object.fromEntries(
-      ((conteo.data ?? []) as { zona: string; efectivas: number }[]).map((z) => [z.zona, Number(z.efectivas)]),
-    ),
-    consultado_en: new Date().toISOString(),
-  };
-  guardar(`avance:${uid}:${encuestaId}`, avance);
-  return avance;
+  try {
+    const [tablero, equipoPorZona] = await Promise.all([
+      supabase().rpc('tablero_encuesta', { p_encuesta: encuestaId }),
+      leerConteoSecciones(encuestaId),
+    ]);
+    if (tablero.error || !tablero.data) throw tablero.error;
+    const datos = tablero.data as {
+      totales: { efectivas: number; hoy: number };
+      por_zona: { zona: string; n: number }[];
+    };
+    const avance: AvancePropio = {
+      efectivas: datos.totales.efectivas ?? 0,
+      hoy: datos.totales.hoy ?? 0,
+      propiasPorZona: Object.fromEntries(datos.por_zona.map((z) => [z.zona, z.n])),
+      equipoPorZona,
+      consultado_en: new Date().toISOString(),
+    };
+    guardar(`avance:${uid}:${encuestaId}`, avance);
+    return avance;
+  } catch {
+    return avanceEnCache(uid, encuestaId);
+  }
 }
-
-// ---------------------------------------------------------------------------
-// Ubicación
-// ---------------------------------------------------------------------------
 
 export type Ubicacion = { lat: number; lng: number; precision_m: number };
 

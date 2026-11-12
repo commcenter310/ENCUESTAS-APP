@@ -18,7 +18,8 @@
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "read-excel-file": "9.3.13"
+    "read-excel-file": "9.3.13",
+    "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",

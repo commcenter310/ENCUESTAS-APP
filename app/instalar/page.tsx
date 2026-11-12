@@ -39,7 +39,11 @@ export default function Instalar() {
 
   const noCoinciden = confirmar.length > 0 && password !== confirmar;
   const listo =
-    codigo.trim() && nombre.trim().length >= 2 && correo.includes('@') && password.length >= 8 && password === confirmar;
+    codigo.trim() &&
+    nombre.trim().length >= 2 &&
+    correo.includes('@') &&
+    password.length >= 8 &&
+    password === confirmar;
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();

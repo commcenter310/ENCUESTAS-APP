@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Check, CreditCard, EyeOff, X } from 'lucide-react';
 import { AreaTexto, Boton, Entrada, cx } from '@/components/ui';
-import { NSNC, esVisible, filasDe, opcionesDe, personasDe } from '@/lib/encuesta/motor';
+import { esVisible, filasDe, opcionesDe, personasDe, vacio } from '@/lib/encuesta/motor';
+import { NSNC } from '@/lib/encuesta/opciones';
 import type {
   DefinicionEncuesta,
   Opcion,
@@ -32,14 +33,6 @@ type Props<P extends Pregunta = Pregunta> = {
   compacta?: boolean;
 };
 
-function vacio(v: Valor | undefined): boolean {
-  return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
-}
-
-// ---------------------------------------------------------------------------
-// Piezas comunes
-// ---------------------------------------------------------------------------
-
 function NoLeer() {
   return (
     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-tinta-2 uppercase">
@@ -50,15 +43,7 @@ function NoLeer() {
 }
 
 /** Opción grande de lista, para un solo toque con el pulgar. */
-function OpcionLista({
-  opcion,
-  elegida,
-  alElegir,
-}: {
-  opcion: Opcion;
-  elegida: boolean;
-  alElegir: () => void;
-}) {
+function OpcionLista({ opcion, elegida, alElegir }: { opcion: Opcion; elegida: boolean; alElegir: () => void }) {
   return (
     <button
       type="button"
@@ -155,10 +140,6 @@ function TarjetaParaMostrar({ opciones, alCerrar }: { opciones: Opcion[]; alCerr
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Tipos de pregunta
-// ---------------------------------------------------------------------------
 
 function Unica({ def, pregunta: p, version, respuestas, alCambiar, compacta }: Props<PreguntaUnica>) {
   const [tarjeta, setTarjeta] = useState(false);
@@ -349,8 +330,17 @@ function Matriz({
         const clave = `${p.id}.${f.valor}`;
         const valor = respuestas[clave];
         return (
-          <Fila key={f.valor} titulo={f.etiqueta} lista={!vacio(valor)} falta={Boolean(marcarFaltantes) && vacio(valor)}>
-            <div role="radiogroup" aria-label={f.etiqueta} className={cx('grid gap-2', columnasParaFichas(p.columnas.length))}>
+          <Fila
+            key={f.valor}
+            titulo={f.etiqueta}
+            lista={!vacio(valor)}
+            falta={Boolean(marcarFaltantes) && vacio(valor)}
+          >
+            <div
+              role="radiogroup"
+              aria-label={f.etiqueta}
+              className={cx('grid gap-2', columnasParaFichas(p.columnas.length))}
+            >
               {p.columnas.map((c) => (
                 <Ficha
                   key={c.valor}

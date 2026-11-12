@@ -2,13 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ClipboardList, FileText, LayoutDashboard, ListChecks, MapPinned, Smartphone, Users } from 'lucide-react';
+import {
+  BarChart3,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  ListChecks,
+  MapPinned,
+  Smartphone,
+  Users,
+} from 'lucide-react';
 import { ProveedorPanel, usePanel } from '@/components/admin/contexto';
 import { MenuCuenta } from '@/components/cuenta';
 import { Marca } from '@/components/marca';
 import { useAcceso } from '@/components/sesion';
 import { Aviso, Insignia, PantallaCargando, Selector, cx } from '@/components/ui';
-import { nombreDeTipo } from '@/lib/encuesta/tipos';
+import { estadoDeEncuesta, nombreDeTipo } from '@/lib/encuesta/tipos';
 
 const SECCIONES = [
   { ruta: '/admin', nombre: 'Tablero', icono: LayoutDashboard },
@@ -18,8 +27,6 @@ const SECCIONES = [
   { ruta: '/admin/usuarios', nombre: 'Usuarios', icono: Users },
   { ruta: '/admin/encuestas', nombre: 'Encuestas', icono: FileText },
 ] as const;
-
-const ESTADOS = { borrador: 'Borrador', activa: 'Activa', cerrada: 'Cerrada' } as const;
 
 function Navegacion() {
   const ruta = usePathname();
@@ -75,9 +82,7 @@ function SelectorDeEncuesta() {
       ) : (
         <span className="truncate text-sm font-semibold">{encuesta.titulo}</span>
       )}
-      <Insignia tono={encuesta.estado === 'activa' ? 'bien' : encuesta.estado === 'cerrada' ? 'neutro' : 'aviso'}>
-        {ESTADOS[encuesta.estado]}
-      </Insignia>
+      <Insignia tono={estadoDeEncuesta(encuesta.estado).tono}>{estadoDeEncuesta(encuesta.estado).nombre}</Insignia>
       <Insignia tono="marca" className="hidden sm:inline-flex">
         {nombreDeTipo(encuesta.tipo)}
       </Insignia>

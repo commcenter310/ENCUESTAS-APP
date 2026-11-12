@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import guasave from '../../encuestas/guasave-ims.json';
+import { clavesCerradas, columnasDeRespuestas } from './columnas';
 import {
   aplicarDerivadas,
-  clavesCerradas,
-  columnasDeRespuestas,
   cumple,
   esVisible,
   filasDe,
@@ -12,23 +11,14 @@ import {
   opcionesDe,
   personasDe,
   preguntasVisibles,
-  promedioDeEscala,
-  resolverOpciones,
-  resumirConteo,
-  revisarDefinicion,
-  rotar,
   siguienteVersion,
   todasLasPreguntas,
   validarPregunta,
 } from './motor';
-import type {
-  DefinicionEncuesta,
-  Opcion,
-  Pregunta,
-  PreguntaAtributos,
-  PreguntaUnica,
-  Respuestas,
-} from './tipos';
+import { resolverOpciones, rotar } from './opciones';
+import { promedioDeEscala, resumirConteo } from './reportes';
+import { revisarDefinicion } from './revisar';
+import type { DefinicionEncuesta, Opcion, Pregunta, PreguntaAtributos, PreguntaUnica, Respuestas } from './tipos';
 
 const def = guasave as unknown as DefinicionEncuesta;
 
@@ -88,9 +78,17 @@ describe('definición de Guasave', () => {
   it('incluye todas las preguntas del cuestionario en papel', () => {
     const ids = todasLasPreguntas(def).map((x) => x.pregunta.id);
     const esperadas = [
-      'F1', 'F2', 'F3',
+      'F1',
+      'F2',
+      'F3',
       ...Array.from({ length: 21 }, (_, i) => `P${i + 1}`),
-      'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'DOM',
+      'S1',
+      'S2',
+      'S3',
+      'S4',
+      'S5',
+      'S6',
+      'DOM',
     ];
     expect(ids).toEqual(esperadas);
   });
@@ -139,7 +137,11 @@ describe('rotación', () => {
     const p12 = pregunta<PreguntaUnica>('P12');
     expect(opcionesDe(def, p12, 'A')[0].valor).toBe('pri');
     expect(opcionesDe(def, p12, 'B')[0].valor).not.toBe('pri');
-    expect(opcionesDe(def, p12, 'C').slice(-2).map((o) => o.valor)).toEqual(['ninguno', 'nsnc']);
+    expect(
+      opcionesDe(def, p12, 'C')
+        .slice(-2)
+        .map((o) => o.valor),
+    ).toEqual(['ninguno', 'nsnc']);
     const p20 = pregunta<Extract<Pregunta, { tipo: 'matriz' }>>('P20');
     expect(filasDe(def, p20, 'A')[0].valor).toBe('cecilia_ramirez');
     expect(filasDe(def, p20, 'B')[0].valor).not.toBe('cecilia_ramirez');
@@ -164,8 +166,28 @@ describe('lógica del cuestionario', () => {
     expect(cumple({ pregunta: 'x', es: ['a', 'b'] }, { x: 'b' })).toBe(true);
     expect(cumple({ pregunta: 'x', noEs: 'a' }, { x: 'b' })).toBe(true);
     expect(cumple({ pregunta: 'x', noEs: 'a' }, {})).toBe(false);
-    expect(cumple({ todas: [{ pregunta: 'x', es: 'a' }, { pregunta: 'y', mayorQue: 3 }] }, { x: 'a', y: 4 })).toBe(true);
-    expect(cumple({ alguna: [{ pregunta: 'x', es: 'a' }, { pregunta: 'y', es: 1 }] }, { x: 'z' })).toBe(false);
+    expect(
+      cumple(
+        {
+          todas: [
+            { pregunta: 'x', es: 'a' },
+            { pregunta: 'y', mayorQue: 3 },
+          ],
+        },
+        { x: 'a', y: 4 },
+      ),
+    ).toBe(true);
+    expect(
+      cumple(
+        {
+          alguna: [
+            { pregunta: 'x', es: 'a' },
+            { pregunta: 'y', es: 1 },
+          ],
+        },
+        { x: 'z' },
+      ),
+    ).toBe(false);
   });
 
   it('calcula el grupo de edad a partir de la edad', () => {

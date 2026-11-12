@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { PLANTILLA_CSV, interpretarMuestra, leerCsv, type Hoja } from './muestra';
 import {
-  PLANTILLA_CSV,
-  interpretarMuestra,
-  leerCsv,
+  autollenarDistritos,
+  avanceDeMuestra,
+  estadoDeSeccion,
   levantadasEn,
   resumirMuestra,
+  revisarSeccion,
   ubicarSeccion,
-  type Hoja,
-} from './muestra';
+} from './muestra-avance';
+import type { DefinicionEncuesta } from './encuesta/tipos';
 
 /** Misma forma que el archivo de diseño muestral de Guasave (recortado). */
 const ARCHIVO: Hoja[] = [
@@ -18,7 +20,15 @@ const ARCHIVO: Hoja[] = [
   {
     nombre: 'Grandes',
     filas: [
-      ['#', 'SECCIÓN', 'DTTO LOCAL', 'LISTA NOMINAL', 'ENTREVISTAS PROPORCIONALES', 'ENTREVISTAS A LEVANTAR', 'FACTOR DE PONDERACIÓN'],
+      [
+        '#',
+        'SECCIÓN',
+        'DTTO LOCAL',
+        'LISTA NOMINAL',
+        'ENTREVISTAS PROPORCIONALES',
+        'ENTREVISTAS A LEVANTAR',
+        'FACTOR DE PONDERACIÓN',
+      ],
       [1, 2136, 7, 6537, 32.67, 10, 3.267],
       [2, 3937, 8, 1875, 9.37, 9, 1.041],
       ['TOTAL', null, null, 8412, 42.04, 19, null],
@@ -29,7 +39,16 @@ const ARCHIVO: Hoja[] = [
   {
     nombre: 'Aleatorias',
     filas: [
-      ['#', 'SECCIÓN', 'DTTO LOCAL', 'LISTA NOMINAL', 'ENTREVISTAS', 'FACTOR DE PONDERACIÓN', 'REEMPLAZO', 'LN REEMPLAZO'],
+      [
+        '#',
+        'SECCIÓN',
+        'DTTO LOCAL',
+        'LISTA NOMINAL',
+        'ENTREVISTAS',
+        'FACTOR DE PONDERACIÓN',
+        'REEMPLAZO',
+        'LN REEMPLAZO',
+      ],
       [1, 2108, 7, 495, 10, 0.94, 2109, 577],
       [2, 2151, 8, 156, 10, 0.94, 2152, 200],
       ['Método: PPS sistemático.'],
@@ -53,10 +72,46 @@ describe('interpretar el archivo de muestra', () => {
     expect(r.errores).toEqual([]);
     expect(r.hojas).toEqual(['Grandes', 'Aleatorias']);
     expect(r.secciones).toEqual([
-      { seccion: '2136', distrito_local: 7, distrito_federal: 4, meta: 10, estrato: 'Grande', lista_nominal: 6537, factor_ponderacion: 3.267, reemplazo: null },
-      { seccion: '3937', distrito_local: 8, distrito_federal: 4, meta: 9, estrato: 'Grande', lista_nominal: 1875, factor_ponderacion: 1.041, reemplazo: null },
-      { seccion: '2108', distrito_local: 7, distrito_federal: 4, meta: 10, estrato: 'Aleatoria', lista_nominal: 495, factor_ponderacion: 0.94, reemplazo: '2109' },
-      { seccion: '2151', distrito_local: 8, distrito_federal: 4, meta: 10, estrato: 'Aleatoria', lista_nominal: 156, factor_ponderacion: 0.94, reemplazo: '2152' },
+      {
+        seccion: '2136',
+        distrito_local: 7,
+        distrito_federal: 4,
+        meta: 10,
+        estrato: 'Grande',
+        lista_nominal: 6537,
+        factor_ponderacion: 3.267,
+        reemplazo: null,
+      },
+      {
+        seccion: '3937',
+        distrito_local: 8,
+        distrito_federal: 4,
+        meta: 9,
+        estrato: 'Grande',
+        lista_nominal: 1875,
+        factor_ponderacion: 1.041,
+        reemplazo: null,
+      },
+      {
+        seccion: '2108',
+        distrito_local: 7,
+        distrito_federal: 4,
+        meta: 10,
+        estrato: 'Aleatoria',
+        lista_nominal: 495,
+        factor_ponderacion: 0.94,
+        reemplazo: '2109',
+      },
+      {
+        seccion: '2151',
+        distrito_local: 8,
+        distrito_federal: 4,
+        meta: 10,
+        estrato: 'Aleatoria',
+        lista_nominal: 156,
+        factor_ponderacion: 0.94,
+        reemplazo: '2152',
+      },
     ]);
   });
 
@@ -93,7 +148,17 @@ describe('interpretar el archivo de muestra', () => {
   });
 
   it('explica qué falta si no hay columnas reconocibles', () => {
-    expect(interpretarMuestra([{ nombre: 'X', filas: [['a', 'b'], [1, 2]] }]).errores[0]).toMatch(/SECCIÓN/);
+    expect(
+      interpretarMuestra([
+        {
+          nombre: 'X',
+          filas: [
+            ['a', 'b'],
+            [1, 2],
+          ],
+        },
+      ]).errores[0],
+    ).toMatch(/SECCIÓN/);
   });
 
   it('descarta reemplazos que también son titulares o que se repiten', () => {
@@ -115,6 +180,20 @@ describe('interpretar el archivo de muestra', () => {
 });
 
 describe('CSV', () => {
+  it('entiende coma de miles y coma decimal', () => {
+    const r = interpretarMuestra([
+      {
+        nombre: 'CSV',
+        filas: leerCsv('SECCION;DL;DF;ENTREVISTAS;FACTOR;LISTA NOMINAL\n100;1;4;10;3,27;1,000\n101;1;4;5;0.94;6537\n'),
+      },
+    ]);
+    expect(r.errores).toEqual([]);
+    expect(r.secciones.map((s) => [s.factor_ponderacion, s.lista_nominal])).toEqual([
+      [3.27, 1000],
+      [0.94, 6537],
+    ]);
+  });
+
   it('lee la plantilla con BOM y comas', () => {
     const r = interpretarMuestra([{ nombre: 'CSV', filas: leerCsv(PLANTILLA_CSV) }]);
     expect(r.errores).toEqual([]);
@@ -161,5 +240,67 @@ describe('uso en campo', () => {
       { estrato: 'Aleatoria', secciones: 2, meta: 20 },
       { estrato: 'Grande', secciones: 2, meta: 19 },
     ]);
+  });
+});
+
+describe('avance y topes', () => {
+  const { secciones } = interpretarMuestra(ARCHIVO);
+
+  it('clasifica cada sección según su avance', () => {
+    expect([0, 3, 10, 12].map((n) => estadoDeSeccion(n, 10))).toEqual([
+      'sin_iniciar',
+      'en_curso',
+      'completa',
+      'excedida',
+    ]);
+  });
+
+  it('resume el avance: útiles sin excedentes, reemplazos y secciones fuera de muestra', () => {
+    const a = avanceDeMuestra(secciones, { '2136': 12, '2108': 4, '2109': 6, '3937': 1, '9999': 2 });
+    expect(a.filas.map((f) => f.seccion)).toEqual(['2108', '2136', '2151', '3937']);
+    expect(a).toMatchObject({
+      meta: 39,
+      utiles: 21,
+      excedentes: 2,
+      completas: 2,
+      conReemplazo: 1,
+      fuera: [['9999', 2]],
+    });
+    expect(a.filas.find((f) => f.seccion === '2108')).toMatchObject({
+      levantadas: 10,
+      enReemplazo: 6,
+      estado: 'completa',
+    });
+    expect(a.porDistritoLocal).toEqual([
+      { distrito: 7, meta: 20, utiles: 20 },
+      { distrito: 8, meta: 19, utiles: 1 },
+    ]);
+  });
+
+  it('revisa la sección elegida en campo contra su tope', () => {
+    expect(revisarSeccion([], 2136, {}, {})).toBeNull();
+    expect(revisarSeccion(secciones, 9999, {}, {})).toMatchObject({ ubicacion: { tipo: 'fuera' } });
+    expect(revisarSeccion(secciones, 2136, { '2136': 10 }, { '2136': 3 })).toMatchObject({
+      levantadas: 10,
+      propias: 3,
+      llena: true,
+    });
+    expect(revisarSeccion(secciones, 2109, { '2108': 2 }, {})).toMatchObject({
+      ubicacion: { tipo: 'reemplazo' },
+      levantadas: 2,
+      llena: false,
+    });
+  });
+
+  it('llena los distritos y los corrige si cambia la sección, sin pisar lo escrito a mano', () => {
+    const def = {
+      monitoreo: { autollenar: { distrito_local: 'DL', distrito_federal: 'DF' } },
+    } as unknown as DefinicionEncuesta;
+    const [s7, s8] = [secciones.find((s) => s.seccion === '2136')!, secciones.find((s) => s.seccion === '3937')!];
+    const primero = autollenarDistritos(def, s7, {});
+    expect(primero).toEqual({ respuestas: { DL: 7, DF: 4 }, autollenado: { DL: 7, DF: 4 } });
+    const cambio = autollenarDistritos(def, s8, primero.respuestas, primero.autollenado);
+    expect(cambio.respuestas).toEqual({ DL: 8, DF: 4 });
+    expect(autollenarDistritos(def, s8, { DL: 5 }, primero.autollenado).respuestas).toEqual({ DL: 5, DF: 4 });
   });
 });

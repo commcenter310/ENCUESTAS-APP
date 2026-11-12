@@ -35,11 +35,10 @@ export type ResultadoMuestra = {
   avisos: string[];
   /** Hojas de donde salieron las secciones. */
   hojas: string[];
+  /** Secciones sin distrito (para pedir uno por defecto al cargar). */
+  faltanDf: number;
+  faltanDl: number;
 };
-
-// ---------------------------------------------------------------------------
-// Encabezados
-// ---------------------------------------------------------------------------
 
 /** "Dtto. Federal" → "DTTO FEDERAL"; "SECCIÓN" → "SECCION". */
 export function normalizar(texto: unknown): string {
@@ -104,14 +103,17 @@ function encabezadoDe(hoja: Hoja): { fila: number; columnas: Columnas } | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Valores
-// ---------------------------------------------------------------------------
-
+/**
+ * Número de una celda. En texto, la coma seguida de exactamente 3 dígitos es de
+ * miles ("1,000"); cualquier otra coma es decimal ("3,27" de un CSV con ";").
+ */
 function numero(valor: unknown): number | null {
   if (valor === null || valor === undefined || valor === '') return null;
-  const n = typeof valor === 'number' ? valor : Number(String(valor).trim().replace(/,/g, ''));
-  return Number.isFinite(n) ? n : null;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
+  let texto = String(valor).trim();
+  texto = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(texto) ? texto.replace(/,/g, '') : texto.replace(',', '.');
+  const n = Number(texto);
+  return texto && Number.isFinite(n) ? n : null;
 }
 
 /** Sección como texto entero ("2136"), o null si la celda no es una sección. */
@@ -145,10 +147,6 @@ function singular(nombre: string): string {
   return t;
 }
 
-// ---------------------------------------------------------------------------
-// Interpretación
-// ---------------------------------------------------------------------------
-
 export function interpretarMuestra(
   hojas: Hoja[],
   opciones: { distritoFederal?: number | null; distritoLocal?: number | null } = {},
@@ -172,6 +170,8 @@ export function interpretarMuestra(
       ],
       avisos,
       hojas: [],
+      faltanDf: 0,
+      faltanDl: 0,
     };
   }
 
@@ -204,7 +204,9 @@ export function interpretarMuestra(
 
       const meta = numero(fila[columnas.meta!]);
       if (meta === null || !Number.isInteger(meta) || meta <= 0) {
-        errores.push(`${lugar}: la sección ${seccion} no tiene un número de entrevistas válido (${String(fila[columnas.meta!] ?? 'vacío')}).`);
+        errores.push(
+          `${lugar}: la sección ${seccion} no tiene un número de entrevistas válido (${String(fila[columnas.meta!] ?? 'vacío')}).`,
+        );
         continue;
       }
       if (origen.has(seccion)) {
@@ -218,9 +220,15 @@ export function interpretarMuestra(
       secciones.push({
         seccion,
         distrito_local:
-          (columnas.dl !== undefined ? entero(fila[columnas.dl]) : null) ?? deApoyo?.dl ?? opciones.distritoLocal ?? null,
+          (columnas.dl !== undefined ? entero(fila[columnas.dl]) : null) ??
+          deApoyo?.dl ??
+          opciones.distritoLocal ??
+          null,
         distrito_federal:
-          (columnas.df !== undefined ? entero(fila[columnas.df]) : null) ?? deApoyo?.df ?? opciones.distritoFederal ?? null,
+          (columnas.df !== undefined ? entero(fila[columnas.df]) : null) ??
+          deApoyo?.df ??
+          opciones.distritoFederal ??
+          null,
         meta,
         estrato: estratoCelda ? estratoBonito(estratoCelda) : variasHojas ? singular(hoja.nombre) : null,
         lista_nominal: columnas.ln !== undefined ? entero(fila[columnas.ln]) : null,
@@ -253,7 +261,9 @@ export function interpretarMuestra(
   for (const s of secciones) {
     if (!s.reemplazo) continue;
     if (titulares.has(s.reemplazo)) {
-      avisos.push(`La sección ${s.reemplazo} es titular y también reemplazo de la ${s.seccion}; no se usará como reemplazo.`);
+      avisos.push(
+        `La sección ${s.reemplazo} es titular y también reemplazo de la ${s.seccion}; no se usará como reemplazo.`,
+      );
       s.reemplazo = null;
     } else if (usados.has(s.reemplazo)) {
       avisos.push(
@@ -265,12 +275,8 @@ export function interpretarMuestra(
     }
   }
 
-  return { secciones, errores, avisos, hojas: deMuestra.map((l) => l.hoja.nombre) };
+  return { secciones, errores, avisos, hojas: deMuestra.map((l) => l.hoja.nombre), faltanDf: sinDf, faltanDl: sinDl };
 }
-
-// ---------------------------------------------------------------------------
-// CSV
-// ---------------------------------------------------------------------------
 
 /** Lee un CSV sencillo (comillas dobles, separador "," ";" o tabulador). */
 export function leerCsv(contenido: string): unknown[][] {
@@ -310,67 +316,19 @@ export function leerCsv(contenido: string): unknown[][] {
   return filas.filter((f) => f.some((c) => c.trim() !== ''));
 }
 
+/** Encabezados de la muestra en CSV (plantilla y descarga). */
+export const COLUMNAS_CSV = [
+  'SECCION',
+  'DISTRITO LOCAL',
+  'DISTRITO FEDERAL',
+  'ENTREVISTAS',
+  'ESTRATO',
+  'LISTA NOMINAL',
+  'FACTOR DE PONDERACION',
+  'REEMPLAZO',
+] as const;
+
 export const PLANTILLA_CSV =
-  '﻿SECCION,DISTRITO LOCAL,DISTRITO FEDERAL,ENTREVISTAS,ESTRATO,LISTA NOMINAL,FACTOR DE PONDERACION,REEMPLAZO\r\n' +
+  `\uFEFF${COLUMNAS_CSV.join(',')}\r\n` +
   '2136,7,4,10,Grande,6537,3.27,\r\n' +
   '2108,7,4,10,Aleatoria,495,0.94,2109\r\n';
-
-// ---------------------------------------------------------------------------
-// Uso en campo y en el tablero
-// ---------------------------------------------------------------------------
-
-export type UbicacionSeccion =
-  | { tipo: 'titular'; fila: SeccionMuestra }
-  | { tipo: 'reemplazo'; fila: SeccionMuestra }
-  | { tipo: 'fuera' };
-
-/** ¿La sección es titular de la muestra, reemplazo de una titular o está fuera? */
-export function ubicarSeccion(muestra: SeccionMuestra[], seccion: string | number | null | undefined): UbicacionSeccion {
-  const clave = seccionDe(seccion);
-  if (!clave) return { tipo: 'fuera' };
-  const titular = muestra.find((s) => s.seccion === clave);
-  if (titular) return { tipo: 'titular', fila: titular };
-  const reemplazada = muestra.find((s) => s.reemplazo === clave);
-  if (reemplazada) return { tipo: 'reemplazo', fila: reemplazada };
-  return { tipo: 'fuera' };
-}
-
-/** Entrevistas que cuentan para una sección de la muestra (titular + su reemplazo). */
-export function levantadasEn(fila: SeccionMuestra, conteo: Record<string, number>): number {
-  return (conteo[fila.seccion] ?? 0) + (fila.reemplazo ? (conteo[fila.reemplazo] ?? 0) : 0);
-}
-
-export type ResumenMuestra = {
-  secciones: number;
-  meta: number;
-  porDistritoLocal: { distrito: number | null; secciones: number; meta: number }[];
-  porDistritoFederal: { distrito: number | null; secciones: number; meta: number }[];
-  porEstrato: { estrato: string; secciones: number; meta: number }[];
-};
-
-export function resumirMuestra(muestra: SeccionMuestra[]): ResumenMuestra {
-  const agrupar = <K,>(clave: (s: SeccionMuestra) => K) => {
-    const mapa = new Map<K, { secciones: number; meta: number }>();
-    for (const s of muestra) {
-      const g = mapa.get(clave(s)) ?? { secciones: 0, meta: 0 };
-      g.secciones++;
-      g.meta += s.meta;
-      mapa.set(clave(s), g);
-    }
-    return [...mapa.entries()];
-  };
-  const porNumero = (a: number | null, b: number | null) => (a ?? Infinity) - (b ?? Infinity);
-  return {
-    secciones: muestra.length,
-    meta: muestra.reduce((suma, s) => suma + s.meta, 0),
-    porDistritoLocal: agrupar((s) => s.distrito_local)
-      .map(([distrito, g]) => ({ distrito, ...g }))
-      .sort((a, b) => porNumero(a.distrito, b.distrito)),
-    porDistritoFederal: agrupar((s) => s.distrito_federal)
-      .map(([distrito, g]) => ({ distrito, ...g }))
-      .sort((a, b) => porNumero(a.distrito, b.distrito)),
-    porEstrato: agrupar((s) => s.estrato ?? 'Sin estrato')
-      .map(([estrato, g]) => ({ estrato, ...g }))
-      .sort((a, b) => b.meta - a.meta),
-  };
-}

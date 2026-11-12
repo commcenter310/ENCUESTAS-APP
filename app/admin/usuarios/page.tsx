@@ -10,10 +10,7 @@ import { mensajeDeFuncion, supabase } from '@/lib/supabase';
 
 type Perfil = { id: string; nombre: string; correo: string; rol: Rol; activo: boolean; creado_en: string };
 
-type Accion =
-  | { tipo: 'crear' }
-  | { tipo: 'editar'; perfil: Perfil }
-  | { tipo: 'password'; perfil: Perfil };
+type Accion = { tipo: 'crear' } | { tipo: 'editar'; perfil: Perfil } | { tipo: 'password'; perfil: Perfil };
 
 /** Contraseña al azar fácil de dictar: sin 0/O ni 1/l. */
 function generarPassword(): string {
@@ -127,7 +124,11 @@ function Formulario({ accion, alCerrar, alGuardar }: { accion: Accion; alCerrar:
             Cancelar
           </Boton>
           <Boton type="submit" cargando={enviando} disabled={!listo}>
-            {accion.tipo === 'crear' ? 'Crear usuario' : accion.tipo === 'editar' ? 'Guardar cambios' : 'Cambiar contraseña'}
+            {accion.tipo === 'crear'
+              ? 'Crear usuario'
+              : accion.tipo === 'editar'
+                ? 'Guardar cambios'
+                : 'Cambiar contraseña'}
           </Boton>
         </div>
       </form>
@@ -212,7 +213,11 @@ export default function PaginaUsuarios() {
                       </td>
                       <td className="px-5 py-2.5">
                         <div className="flex justify-end gap-2">
-                          <Boton variante="secundario" tamano="chico" onClick={() => setAccion({ tipo: 'editar', perfil: p })}>
+                          <Boton
+                            variante="secundario"
+                            tamano="chico"
+                            onClick={() => setAccion({ tipo: 'editar', perfil: p })}
+                          >
                             <Pencil className="size-3.5" aria-hidden />
                             Editar
                           </Boton>

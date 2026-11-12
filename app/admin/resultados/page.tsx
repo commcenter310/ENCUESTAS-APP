@@ -4,32 +4,16 @@ import { useCallback, useMemo, useState } from 'react';
 import { Printer } from 'lucide-react';
 import { BotonActualizar, ConEncuesta, Encabezado, EstadoDeConsulta } from '@/components/admin/comunes';
 import { exigir, useConsulta } from '@/components/admin/contexto';
-import {
-  BarraSegmentada,
-  ColumnasDeEscala,
-  Leyenda,
-  ListaDeBarras,
-  coloresDe,
-} from '@/components/admin/graficas';
+import { BarraSegmentada, ColumnasDeEscala, Leyenda, ListaDeBarras, coloresDe } from '@/components/admin/graficas';
 import { Aviso, Boton, Cargando, Tarjeta, cx } from '@/components/ui';
-import {
-  type Conteo,
-  OPCIONES_CONOCE,
-  clavesCerradas,
-  opcionesDeEscala,
-  promedioDeEscala,
-  resolverOpciones,
-  resumirConteo,
-} from '@/lib/encuesta/motor';
+import { clavesCerradas } from '@/lib/encuesta/columnas';
+import { OPCIONES_CONOCE, opcionesDeEscala, resolverOpciones } from '@/lib/encuesta/opciones';
+import { type Conteo, promedioDeEscala, resumirConteo } from '@/lib/encuesta/reportes';
 import type { DefinicionEncuesta, Encuesta, Opcion, Pregunta } from '@/lib/encuesta/tipos';
 import { entero, porcentaje } from '@/lib/formato';
 import { supabase } from '@/lib/supabase';
 
 type Conteos = Record<string, Conteo>;
-
-// ---------------------------------------------------------------------------
-// Respuestas de texto libre (se cargan al pedirlas)
-// ---------------------------------------------------------------------------
 
 function RespuestasAbiertas({ encuestaId, clave, rotulo }: { encuestaId: string; clave: string; rotulo: string }) {
   const [abierto, setAbierto] = useState(false);
@@ -71,10 +55,6 @@ function RespuestasAbiertas({ encuestaId, clave, rotulo }: { encuestaId: string;
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Bloques por tipo de pregunta
-// ---------------------------------------------------------------------------
 
 /** Tabla con una barra segmentada por fila (matrices y opinión). */
 function TablaSegmentada({
@@ -311,7 +291,14 @@ function BloqueDePregunta({
           {p.campos
             .filter((c) => c.tipo === 'unica')
             .map((c) => (
-              <BloqueDePregunta key={c.id} def={def} pregunta={c} conteos={conteos} sinNsnc={sinNsnc} encuestaId={encuestaId} />
+              <BloqueDePregunta
+                key={c.id}
+                def={def}
+                pregunta={c}
+                conteos={conteos}
+                sinNsnc={sinNsnc}
+                encuestaId={encuestaId}
+              />
             ))}
         </>
       );
@@ -351,10 +338,6 @@ function Marco({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Pantalla
-// ---------------------------------------------------------------------------
-
 function ResultadosDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
   const def = encuesta.definicion;
   const claves = useMemo(() => clavesCerradas(def), [def]);
@@ -386,7 +369,11 @@ function ResultadosDeEncuesta({ encuesta }: { encuesta: Encuesta }) {
             : 'Respuestas por pregunta.'
         }
       >
-        <div role="group" aria-label="Cómo calcular los porcentajes" className="flex rounded-lg border border-eje bg-white p-0.5 text-sm">
+        <div
+          role="group"
+          aria-label="Cómo calcular los porcentajes"
+          className="flex rounded-lg border border-eje bg-white p-0.5 text-sm"
+        >
           {[
             { valor: false, texto: 'Con NS/NC' },
             { valor: true, texto: 'Sin NS/NC' },

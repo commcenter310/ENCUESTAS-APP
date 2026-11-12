@@ -18,7 +18,10 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   const efectivas = admin.getByRole('group', { name: 'Entrevistas efectivas', exact: true });
   // Al volver al tablero se ven un instante los datos anteriores y luego se actualizan.
   await efectivas.getByText('998 por levantar').waitFor({ timeout: 15000 });
-  afirmar(/^Entrevistas efectivas 2 ?de 1,000/.test((await efectivas.innerText()).replace(/\s+/g, ' ')), 'cuenta 2 entrevistas efectivas contra la meta de 1,000');
+  afirmar(
+    /^Entrevistas efectivas 2 ?de 1,000/.test((await efectivas.innerText()).replace(/\s+/g, ' ')),
+    'cuenta 2 entrevistas efectivas contra la meta de 1,000',
+  );
   const fila = admin.getByRole('row').filter({ hasText: ENCUESTADOR.nombre });
   await fila.waitFor();
   const celdas = await fila.getByRole('cell').allInnerTexts();
@@ -45,7 +48,10 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   afirmar((await nsnc.innerText()).includes('50.0%'), 'P12: NS/NC tiene 50% (una de dos entrevistas)');
   await admin.getByRole('button', { name: 'Sin NS/NC' }).click();
   await p12.getByText('Base: 1 respuestas').waitFor();
-  afirmar((await p12.getByRole('listitem').first().innerText()).includes('100.0%'), 'sin NS/NC el porcentaje se recalcula sobre la base válida');
+  afirmar(
+    (await p12.getByRole('listitem').first().innerText()).includes('100.0%'),
+    'sin NS/NC el porcentaje se recalcula sobre la base válida',
+  );
   await admin.getByRole('button', { name: 'Con NS/NC' }).click();
   const p2 = admin.getByRole('group', { name: /principal problema de su colonia/ });
   await p2.getByRole('button', { name: 'Ver respuestas' }).click();
@@ -93,14 +99,20 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   const lineas = csv.trim().split('\r\n');
   afirmar(csv.charCodeAt(0) === 0xfeff && lineas.length === 4, 'exporta un CSV con encabezado y las 3 entrevistas');
   afirmar(
-    lineas[0].includes('encuestador') && lineas[0].includes('17 Cecilia Ramírez Montoya (conoce)') && csv.includes(ENCUESTADOR.nombre) && csv.includes('Anulada'),
+    lineas[0].includes('encuestador') &&
+      lineas[0].includes('17 Cecilia Ramírez Montoya (conoce)') &&
+      csv.includes(ENCUESTADOR.nombre) &&
+      csv.includes('Anulada'),
     'el CSV trae una columna por respuesta, el encuestador y la revisión',
   );
 
   await ir('Tablero');
   const despues = admin.getByRole('group', { name: 'Entrevistas efectivas', exact: true });
   await despues.getByText('999 por levantar').waitFor({ timeout: 15000 });
-  afirmar(/^Entrevistas efectivas 1 ?de 1,000/.test((await despues.innerText()).replace(/\s+/g, ' ')), 'la anulada deja de contar en el avance');
+  afirmar(
+    /^Entrevistas efectivas 1 ?de 1,000/.test((await despues.innerText()).replace(/\s+/g, ' ')),
+    'la anulada deja de contar en el avance',
+  );
 
   // ===== 7. Usuarios: desactivar corta el acceso ===============================
   console.log('\n7. Control de acceso');
@@ -189,7 +201,10 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
 
   // ===== 9. Muestra por sección =================================================
   console.log('\n9. Muestra por sección');
-  await admin.getByRole('group', { name: 'Encuesta Municipal Guasave' }).getByRole('link', { name: 'Cargar muestra' }).click();
+  await admin
+    .getByRole('group', { name: 'Encuesta Municipal Guasave' })
+    .getByRole('link', { name: 'Cargar muestra' })
+    .click();
   await admin.getByRole('heading', { name: 'Muestra', level: 1 }).waitFor();
   await texto('Esta encuesta no tiene muestra cargada').waitFor();
   await admin.getByRole('button', { name: 'Cargar muestra' }).first().click();
@@ -198,10 +213,15 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   await carga.getByLabel('Archivo de muestra').setInputFiles({
     name: 'muestra.csv',
     mimeType: 'text/csv',
-    buffer: Buffer.from('SECCIÓN;DTTO LOCAL;ENTREVISTAS;ESTRATO;REEMPLAZO\n1450;7;1;Grande;\n1451;8;3;Aleatoria;1452\n'),
+    buffer: Buffer.from(
+      'SECCIÓN;DTTO LOCAL;ENTREVISTAS;ESTRATO;REEMPLAZO\n1450;7;1;Grande;\n1451;8;3;Aleatoria;1452\n',
+    ),
   });
   await carga.getByText('Falta el distrito federal en 2 secciones').waitFor();
-  afirmar(await carga.getByRole('button', { name: 'Guardar muestra' }).isDisabled(), 'no deja guardar la muestra sin distrito federal');
+  afirmar(
+    await carga.getByRole('button', { name: 'Guardar muestra' }).isDisabled(),
+    'no deja guardar la muestra sin distrito federal',
+  );
   await carga.getByLabel('Distrito federal para las secciones que no lo traen').fill('4');
   await carga.getByText('2 secciones').waitFor();
   await carga.getByText('DF 4').waitFor();
@@ -209,7 +229,10 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   await texto('Muestra guardada: 2 secciones, 4 entrevistas.').waitFor();
   ok('carga la muestra desde un archivo y completa el distrito federal');
   const enMuestra = admin.getByRole('group', { name: 'Entrevistas dentro de la muestra' });
-  afirmar(/1 ?de 4/.test((await enMuestra.innerText()).replace(/\s+/g, ' ')), 'cuenta las entrevistas ya levantadas contra la muestra');
+  afirmar(
+    /1 ?de 4/.test((await enMuestra.innerText()).replace(/\s+/g, ' ')),
+    'cuenta las entrevistas ya levantadas contra la muestra',
+  );
   await admin.getByRole('row').filter({ hasText: '1450' }).getByText('Completa').waitFor();
   ok('marca como completa la sección que llegó a su tope');
   await captura(admin, '14-muestra');
@@ -225,11 +248,18 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   await seccion.fill('1450');
   await campo.getByText('Tope completo').filter({ visible: true }).waitFor();
   await campo.getByRole('button', { name: 'Comenzar' }).click();
-  await campo.getByText(/ya completó su tope \(1 de 1 entrevistas\)/).filter({ visible: true }).waitFor();
+  await campo
+    .getByText(/ya completó su tope \(1 de 1 entrevistas\)/)
+    .filter({ visible: true })
+    .waitFor();
   ok('no deja iniciar una entrevista en una sección que ya llegó a su tope');
   await seccion.fill('9999');
   await campo.getByRole('button', { name: 'Comenzar' }).click();
-  await campo.getByText(/no está en la muestra/).filter({ visible: true }).first().waitFor();
+  await campo
+    .getByText(/no está en la muestra/)
+    .filter({ visible: true })
+    .first()
+    .waitFor();
   ok('rechaza una sección fuera de la muestra');
   await seccion.fill('1452');
   await campo.getByText('Es el reemplazo de la sección 1451').filter({ visible: true }).waitFor();
@@ -238,7 +268,10 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   await campo.getByRole('button', { name: 'Ver secciones de la muestra' }).click();
   const lista = campo.getByRole('dialog');
   await lista.getByText('0/3').waitFor();
-  afirmar((await lista.getByRole('button', { name: /^1450/ }).count()) === 0, 'la lista de secciones oculta las que ya completaron su tope');
+  afirmar(
+    (await lista.getByRole('button', { name: /^1450/ }).count()) === 0,
+    'la lista de secciones oculta las que ya completaron su tope',
+  );
   await lista.getByRole('button', { name: /^1451/ }).click();
   afirmar((await seccion.inputValue()) === '1451', 'elegir de la lista llena la sección');
   await captura(campo, '15-seccion-muestra');

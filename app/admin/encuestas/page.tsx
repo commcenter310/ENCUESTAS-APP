@@ -1,22 +1,37 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Check, Download, FileUp, MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Encabezado } from '@/components/admin/comunes';
-import { mensajeDeError, useConsulta, usePanel } from '@/components/admin/contexto';
-import { Aviso, AreaTexto, Boton, Campo, Cargando, Entrada, Insignia, Modal, Selector, Tarjeta, Vacio } from '@/components/ui';
-import { revisarDefinicion, todasLasPreguntas } from '@/lib/encuesta/motor';
-import { type DefinicionEncuesta, type Encuesta, type TipoEncuesta, TIPOS_ENCUESTA, nombreDeTipo } from '@/lib/encuesta/tipos';
+import { mensajeDeError, usePanel } from '@/components/admin/contexto';
+import {
+  Aviso,
+  AreaTexto,
+  Boton,
+  Campo,
+  Cargando,
+  Entrada,
+  Insignia,
+  Modal,
+  Selector,
+  Tarjeta,
+  Vacio,
+} from '@/components/ui';
+import { todasLasPreguntas } from '@/lib/encuesta/motor';
+import { revisarDefinicion } from '@/lib/encuesta/revisar';
+import {
+  type DefinicionEncuesta,
+  type Encuesta,
+  ESTADOS_ENCUESTA,
+  type TipoEncuesta,
+  TIPOS_ENCUESTA,
+  estadoDeEncuesta,
+  nombreDeTipo,
+} from '@/lib/encuesta/tipos';
 import { descargar } from '@/lib/exportar';
 import { entero } from '@/lib/formato';
 import { supabase } from '@/lib/supabase';
-
-const ESTADOS = [
-  { valor: 'borrador', nombre: 'Borrador', ayuda: 'Solo la ve el administrador.' },
-  { valor: 'activa', nombre: 'Activa', ayuda: 'Los encuestadores pueden levantarla.' },
-  { valor: 'cerrada', nombre: 'Cerrada', ayuda: 'Ya no se inician entrevistas nuevas.' },
-] as const;
 
 type Edicion = { tipo: 'nueva' } | { tipo: 'editar'; encuesta: Encuesta };
 
@@ -31,7 +46,15 @@ function aClave(texto: string): string {
 }
 
 /** Alta de una encuesta desde su definición JSON, o edición de una existente. */
-function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerrar: () => void; alGuardar: () => void }) {
+function Formulario({
+  edicion,
+  alCerrar,
+  alGuardar,
+}: {
+  edicion: Edicion;
+  alCerrar: () => void;
+  alGuardar: () => void;
+}) {
   const actual = edicion.tipo === 'editar' ? edicion.encuesta : null;
   const [titulo, setTitulo] = useState(actual?.titulo ?? '');
   const [descripcion, setDescripcion] = useState(actual?.descripcion ?? '');
@@ -86,7 +109,11 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
       ? await supabase().from('encuestas').update(comunes).eq('id', actual.id).select('id').single()
       : await supabase()
           .from('encuestas')
-          .insert({ ...comunes, clave: `${aClave(titulo) || 'encuesta'}-${Date.now().toString(36)}`, estado: 'borrador' })
+          .insert({
+            ...comunes,
+            clave: `${aClave(titulo) || 'encuesta'}-${Date.now().toString(36)}`,
+            estado: 'borrador',
+          })
           .select('id')
           .single();
     setEnviando(false);
@@ -203,24 +230,6 @@ function Formulario({ edicion, alCerrar, alGuardar }: { edicion: Edicion; alCerr
 
 export default function PaginaEncuestas() {
   const { encuestas, cargando, recargar, elegir } = usePanel();
-  // Secciones cargadas en la muestra de cada encuesta.
-  const ids = encuestas.map((e) => e.id).join(',');
-  const consultaMuestras = useCallback(async () => {
-    const pares = await Promise.all(
-      ids
-        .split(',')
-        .filter(Boolean)
-        .map(async (id) => {
-          const { count } = await supabase()
-            .from('secciones_muestra')
-            .select('seccion', { count: 'exact', head: true })
-            .eq('encuesta_id', id);
-          return [id, count ?? 0] as const;
-        }),
-    );
-    return Object.fromEntries(pares) as Record<string, number>;
-  }, [ids]);
-  const muestras = useConsulta(consultaMuestras).datos ?? {};
   const [edicion, setEdicion] = useState<Edicion | null>(null);
   const [aviso, setAviso] = useState<{ tono: 'bien' | 'grave'; texto: string } | null>(null);
   const [porBorrar, setPorBorrar] = useState<Encuesta | null>(null);
@@ -278,7 +287,7 @@ export default function PaginaEncuestas() {
       ) : (
         <div className="flex flex-col gap-4">
           {encuestas.map((e) => {
-            const estado = ESTADOS.find((x) => x.valor === e.estado)!;
+            const estado = estadoDeEncuesta(e.estado);
             const preguntas = todasLasPreguntas(e.definicion).length;
             return (
               <Tarjeta key={e.id} role="group" aria-label={e.titulo} className="p-5">
@@ -287,14 +296,10 @@ export default function PaginaEncuestas() {
                     <h2 className="text-lg leading-snug font-semibold">{e.titulo}</h2>
                     {e.descripcion && <p className="mt-0.5 text-sm text-tinta-2">{e.descripcion}</p>}
                     <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-tinta-3">
-                      <Insignia tono={e.estado === 'activa' ? 'bien' : e.estado === 'cerrada' ? 'neutro' : 'aviso'}>
-                        {estado.nombre}
-                      </Insignia>
+                      <Insignia tono={estado.tono}>{estado.nombre}</Insignia>
                       <Insignia tono="marca">{nombreDeTipo(e.tipo)}</Insignia>
                       <span>{preguntas} preguntas</span>
-                      <span>
-                        {muestras[e.id] ? `Muestra: ${entero(muestras[e.id])} secciones` : 'Sin muestra cargada'}
-                      </span>
+                      <span>{e.secciones ? `Muestra: ${entero(e.secciones)} secciones` : 'Sin muestra cargada'}</span>
                       <span>Versiones {e.definicion.versiones.join(', ')}</span>
                       {e.meta_muestra && <span>Meta: {entero(e.meta_muestra)}</span>}
                     </p>
@@ -307,7 +312,7 @@ export default function PaginaEncuestas() {
                       disabled={ocupada === e.id}
                       onChange={(ev) => cambiarEstado(e, ev.target.value)}
                     >
-                      {ESTADOS.map((x) => (
+                      {ESTADOS_ENCUESTA.map((x) => (
                         <option key={x.valor} value={x.valor}>
                           {x.nombre}
                         </option>
@@ -326,9 +331,13 @@ export default function PaginaEncuestas() {
                     className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-eje bg-white px-3 text-sm font-semibold hover:bg-plano"
                   >
                     <MapPinned className="size-3.5" aria-hidden />
-                    {muestras[e.id] ? 'Ver muestra' : 'Cargar muestra'}
+                    {e.secciones ? 'Ver muestra' : 'Cargar muestra'}
                   </Link>
-                  <Boton variante="secundario" tamano="chico" onClick={() => setEdicion({ tipo: 'editar', encuesta: e })}>
+                  <Boton
+                    variante="secundario"
+                    tamano="chico"
+                    onClick={() => setEdicion({ tipo: 'editar', encuesta: e })}
+                  >
                     <Pencil className="size-3.5" aria-hidden />
                     Editar
                   </Boton>
