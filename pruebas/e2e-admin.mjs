@@ -241,6 +241,42 @@ export async function probarPanel({ admin, campo, ok, afirmar, captura, BASE, EN
   await texto('Avance de la muestra por sección').waitFor();
   ok('el tablero mide el avance contra el tope de cada sección');
 
+  // ===== 7. Mapa ================================================================
+  console.log('\n10. Mapa de entrevistas');
+  await ir('Mapa');
+  const mapa = admin.getByRole('region', { name: 'Mapa de entrevistas' });
+  await mapa.and(admin.locator('[data-listo]')).waitFor();
+  const descripcion = await texto(/entrevistas en el mapa/).innerText();
+  const enMapa = Number(descripcion.match(/^(\d+)/)?.[1]);
+  afirmar(enMapa >= 2, `pone en el mapa las entrevistas con GPS (${enMapa})`);
+  // Todas se levantaron en el mismo punto: aparecen agrupadas con su total.
+  const grupo = mapa.locator('.grupo-mapa');
+  afirmar((await grupo.innerText()).trim() === String(enMapa), 'agrupa los pines cercanos y muestra cuántos son');
+  afirmar((await mapa.getByText('OpenStreetMap').count()) > 0, 'muestra la atribución de OpenStreetMap');
+  const leyenda = admin.getByRole('list', { name: 'Leyenda' });
+  await leyenda.getByText('Pendiente').waitFor();
+  await leyenda.getByText('Con alerta').waitFor();
+  ok('la leyenda explica los colores y las alertas');
+  // Al tocar el grupo se abre (acerca o despliega) hasta poder tocar un pin.
+  const pin = mapa.locator('path.pin-mapa').first();
+  for (let i = 0; i < 6 && !(await pin.isVisible()); i++) {
+    await grupo.first().click();
+    await admin.waitForTimeout(700);
+  }
+  await pin.click({ force: true });
+  const globo = mapa.locator('.leaflet-popup');
+  await globo.getByText(ENCUESTADOR.nombre).waitFor();
+  ok('al tocar un pin se ve quién la levantó');
+  await globo.getByRole('button', { name: 'Ver detalle' }).click();
+  await admin.getByRole('dialog').getByRole('button', { name: 'Validar' }).waitFor();
+  ok('desde el pin se abre el detalle de la entrevista');
+  await captura(admin, '16-mapa');
+  await admin.keyboard.press('Escape');
+  await admin.getByRole('combobox', { name: 'Periodo' }).selectOption('ayer');
+  await texto(/^0 entrevistas en el mapa/).waitFor();
+  ok('los filtros quitan del mapa lo que no corresponde');
+  await admin.getByRole('combobox', { name: 'Periodo' }).selectOption('todo');
+
   // --- En campo -----------------------------------------------------------------
   await campo.getByRole('button', { name: 'Actualizar' }).click();
   await campo.getByRole('button', { name: 'Nueva entrevista' }).filter({ visible: true }).first().click();

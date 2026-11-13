@@ -156,7 +156,15 @@ async function soloLocal(contexto) {
     );
     return ruta.abort();
   });
+  // Los mosaicos de OpenStreetMap no se descargan en pruebas: van en blanco.
+  await contexto.route(/^https:\/\/tile\.openstreetmap\.org\//, (ruta) =>
+    ruta.fulfill({ contentType: 'image/png', body: MOSAICO }),
+  );
 }
+const MOSAICO = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+  'base64',
+);
 try {
   // ===== 1. Configuración inicial (escritorio) ================================
   console.log('\n1. Configuración inicial');

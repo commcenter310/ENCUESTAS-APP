@@ -89,3 +89,19 @@ textarea {
     background: #fff;
   }
 }
+
+/* Grupos de pines del mapa: neutros, para no competir con los colores de los puntos. */
+.leaflet-marker-icon.grupo-mapa {
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 9999px;
+  background: rgb(11 11 11 / 0.72);
+  color: #fff;
+  font: 600 13px/1 var(--font-sans);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
+
+.leaflet-container {
+  font-family: var(--font-sans);
+}

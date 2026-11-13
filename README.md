@@ -3,7 +3,7 @@
 App web para levantar encuestas en campo y monitorearlas.
 
 - **Encuestador** (`/encuestador`): captura en celular, una pregunta por pantalla, rotación de versiones (A/B/C), GPS y tiempos automáticos. Funciona sin conexión: las entrevistas se guardan en el teléfono y se envían solas al volver la señal.
-- **Administrador** (`/admin`): tablero de avance (meta, por día, por encuestador, por sección, alertas), resultados por pregunta con y sin NS/NC, revisión de entrevistas (validar/anular), usuarios, encuestas y exportación a Excel (CSV).
+- **Administrador** (`/admin`): tablero de avance (meta, por día, por encuestador, por sección, alertas), resultados por pregunta con y sin NS/NC, revisión de entrevistas (validar/anular), mapa de entrevistas con OpenStreetMap, usuarios, encuestas y exportación a Excel (CSV).
 
 Hecha con Next.js (Vercel) y Supabase (base de datos, cuentas y una Edge Function).
 
